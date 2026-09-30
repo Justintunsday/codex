@@ -110,3 +110,116 @@ fn deleted_file_is_reported_and_unsafe_metadata_is_rejected() -> anyhow::Result<
     assert!(NativeGit::open(&files).is_err());
     Ok(())
 }
+
+#[test]
+fn git_attributes_require_an_explicit_filter_backend_before_staging() -> anyhow::Result<()> {
+    let root = repository()?;
+    std::fs::write(root.path().join("hello.txt"), "Reviewed\n")?;
+    let files = ScopedFiles::new(root.path())?;
+    let preview = NativeGit::open(&files)?.diff("hello.txt", GitLayer::Working)?;
+    let original_index = std::fs::read(root.path().join(".git/index"))?;
+    std::fs::write(root.path().join(".gitattributes"), "*.txt text eol=crlf\n")?;
+    assert!(
+        NativeGit::open(&files)?
+            .stage("hello.txt", &preview.current_id)
+            .is_err()
+    );
+    assert_eq!(
+        std::fs::read(root.path().join(".git/index"))?,
+        original_index
+    );
+    std::fs::remove_file(root.path().join(".gitattributes"))?;
+    std::fs::write(root.path().join(".git/info/attributes"), "*.txt text\n")?;
+    assert!(NativeGit::open(&files).is_err());
+    Ok(())
+}
+
+#[test]
+fn staged_native_commit_retains_unstaged_work_and_refuses_stale_reviews() -> anyhow::Result<()> {
+    let root = repository()?;
+    let files = ScopedFiles::new(root.path())?;
+    std::fs::write(root.path().join("hello.txt"), "Reviewed\n")?;
+    let git = NativeGit::open(&files)?;
+    let preview = git.diff("hello.txt", GitLayer::Working)?;
+    std::fs::write(root.path().join("hello.txt"), "Changed after review\n")?;
+    assert!(git.stage("hello.txt", &preview.current_id).is_err());
+    let preview = git.diff("hello.txt", GitLayer::Working)?;
+    git.stage("hello.txt", &preview.current_id)?;
+    let git = NativeGit::open(&files)?;
+    let report = git.status()?;
+    std::fs::write(root.path().join("hello.txt"), "Unstaged work\n")?;
+    let commit = git.commit(GitCommit {
+        expected_head: report.head_id,
+        expected_index: report.index_id,
+        name: "Native user".into(),
+        email: "native@example.com".into(),
+        message: "Reviewed commit".into(),
+    })?;
+    let repo = gix::open(root.path())?;
+    assert_eq!(repo.head_id()?.to_string(), commit);
+    let git = NativeGit::open(&files)?;
+    assert_eq!(
+        git.status()?.changes,
+        vec![GitChange {
+            path: "hello.txt".into(),
+            index: "".into(),
+            working: "M".into()
+        }]
+    );
+    assert!(
+        git.diff("hello.txt", GitLayer::Working)?
+            .diff
+            .contains("-Changed after review")
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.path().join("hello.txt"))?,
+        "Unstaged work\n"
+    );
+    let report = git.status()?;
+    let preview = git.diff("hello.txt", GitLayer::Working)?;
+    git.stage("hello.txt", &preview.current_id)?;
+    let git = NativeGit::open(&files)?;
+    let old_head = repo.head_id()?.to_string();
+    assert!(
+        git.commit(GitCommit {
+            expected_head: report.head_id,
+            expected_index: report.index_id,
+            name: "Native user".into(),
+            email: "native@example.com".into(),
+            message: "Stale commit".into()
+        })
+        .is_err()
+    );
+    assert_eq!(gix::open(root.path())?.head_id()?.to_string(), old_head);
+    Ok(())
+}
+
+#[test]
+fn newly_initialized_project_can_commit_nested_files_without_replacing_metadata()
+-> anyhow::Result<()> {
+    let root = tempfile::tempdir()?;
+    std::fs::create_dir(root.path().join("Sources"))?;
+    std::fs::write(root.path().join("Sources/hello.txt"), "Nested\n")?;
+    let files = ScopedFiles::new(root.path())?;
+    NativeGit::initialize(&files)?;
+    let git = NativeGit::open(&files)?;
+    let preview = git.diff("Sources/hello.txt", GitLayer::Working)?;
+    git.stage("Sources/hello.txt", &preview.current_id)?;
+    let git = NativeGit::open(&files)?;
+    let report = git.status()?;
+    git.commit(GitCommit {
+        expected_head: report.head_id,
+        expected_index: report.index_id,
+        name: "Native user".into(),
+        email: "native@example.com".into(),
+        message: "Initial commit".into(),
+    })?;
+    let head = gix::open(root.path())?.head_id()?.to_string();
+    assert!(NativeGit::initialize(&files).is_err());
+    assert_eq!(gix::open(root.path())?.head_id()?.to_string(), head);
+    assert_eq!(
+        NativeGit::open(&files)?.status()?.changes,
+        Vec::<GitChange>::new()
+    );
+    Ok(())
+}

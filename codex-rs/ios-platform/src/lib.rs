@@ -6,6 +6,7 @@ pub use files::Change;
 pub use files::FileEntry;
 pub use files::ScopedFiles;
 pub use git::GitChange;
+pub use git::GitCommit;
 pub use git::GitDiff;
 pub use git::GitLayer;
 pub use git::GitReport;
@@ -70,7 +71,7 @@ impl Default for PlatformCapabilities {
             file_access: "authorizedProject",
             process: "unsupported",
             pty: "unsupported",
-            git_commit: "unsupported",
+            git_commit: "nativeStagedCommit",
             jailbreak: "adapterNotInstalled",
             agent_engine: "codexCore",
         }

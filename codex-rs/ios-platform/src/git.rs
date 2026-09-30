@@ -1,10 +1,13 @@
 //! Pure Rust Git file analysis. No executable, hook, filter or credential helper runs.
 #[path = "git_validation.rs"]
 mod validation;
+#[path = "git_write.rs"]
+mod write;
 use validation::index_entries;
 use validation::validate_metadata;
 use validation::validate_mode;
 use validation::validate_path;
+pub use write::GitCommit;
 
 use crate::ScopedFiles;
 use anyhow::Context;
