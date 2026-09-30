@@ -10,8 +10,14 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 codex-api = { workspace = true }
+codex-core = { workspace = true }
+codex-exec-server = { workspace = true }
+codex-extension-api = { workspace = true }
+codex-features = { workspace = true }
 codex-http-client = { workspace = true }
 codex-ios-platform = { workspace = true }
+codex-login = { workspace = true }
+codex-model-provider-info = { workspace = true }
 codex-protocol = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }
@@ -19,6 +25,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio-util = { workspace = true, features = ["rt"] }
 url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 

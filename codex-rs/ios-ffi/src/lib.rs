@@ -53,11 +53,13 @@ pub unsafe extern "C" fn codex_initialize(config: *const c_char) -> u64 {
         }
         std::thread::Builder::new()
             .name("codex-ios-host".into())
+            .stack_size(/*size*/ 8 * 1024 * 1024)
             .spawn(move || {
                 let reporting = event_tx.clone();
                 let result = catch_unwind(AssertUnwindSafe(|| {
                     let runtime = tokio::runtime::Builder::new_multi_thread()
                         .worker_threads(/*val*/ 2)
+                        .thread_stack_size(/*val*/ 8 * 1024 * 1024)
                         .enable_all()
                         .build()
                         .map_err(|error| error.to_string())?;

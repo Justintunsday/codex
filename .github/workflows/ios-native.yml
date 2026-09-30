@@ -23,7 +23,7 @@ concurrency:
 jobs:
   native-app:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -32,6 +32,7 @@ jobs:
             codex-rs/target
             ios/Build/Cargo
           key: ios-${{ runner.os }}-${{ runner.arch }}-rust195-${{ hashFiles('codex-rs/Cargo.lock') }}
+          restore-keys: ios-${{ runner.os }}-${{ runner.arch }}-rust195-
       - name: Install build tools
         run: |
           brew install xcodegen just
@@ -104,7 +105,7 @@ jobs:
       - name: Build summary
         if: always()
         run: |
-          printf '%s\n' 'Native SwiftUI app uses the mobile Responses adapter. Full Codex core migration remains incomplete.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Native SwiftUI app embeds upstream codex-core with sandbox-scoped reviewed file tools. Desktop process/PTY backends are unavailable.' >> "$GITHUB_STEP_SUMMARY"
           printf '%s\n' 'Unsigned artifacts require signing before device installation. Device testing on iOS 16/17/18/26 is still required.' >> "$GITHUB_STEP_SUMMARY"
 
   core-platform-audit:

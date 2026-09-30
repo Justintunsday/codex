@@ -30,9 +30,9 @@ use tokio::sync::oneshot;
 use uuid::Uuid;
 
 pub(crate) struct RequestConfig {
-    model: String,
-    endpoint: String,
-    authorization: HeaderValue,
+    pub(crate) model: String,
+    pub(crate) endpoint: String,
+    pub(crate) authorization: HeaderValue,
 }
 
 impl RequestConfig {
@@ -95,7 +95,7 @@ pub(crate) async fn request_review(
     Ok(())
 }
 
-fn tools() -> Value {
+pub(crate) fn tools() -> Value {
     json!([
         {"type":"function", "name":"list_files", "description":"List an authorized project directory (max 100 results).", "parameters":{"type":"object", "properties":{"path":{"type":"string"}}, "required":["path"], "additionalProperties":false}, "strict":true},
         {"type":"function", "name":"read_file", "description":"Read UTF-8 text in the authorized project (max 2048 characters).", "parameters":{"type":"object", "properties":{"path":{"type":"string"}}, "required":["path"], "additionalProperties":false}, "strict":true},
@@ -252,14 +252,14 @@ pub(crate) async fn run_turn(
     bail!("mobile tool iteration limit reached (12); continue with a new prompt")
 }
 
-async fn execute_tool(
+pub(crate) async fn execute_tool(
     name: &str,
     arguments: &str,
     project: Option<&Arc<ScopedFiles>>,
     reviews: &Reviews,
     events: &mpsc::Sender<Value>,
 ) -> anyhow::Result<String> {
-    if arguments.len() > 70_000 {
+    if arguments.len() > 8192 {
         bail!("tool arguments exceed limit");
     }
     let args: Value = serde_json::from_str(arguments)?;

@@ -12,6 +12,10 @@ esac
 export SDKROOT="$(xcrun --sdk "$task_sdk" --show-sdk-path)"
 rustup target add "$task_target" --toolchain 1.95.0
 cd "$task_root/codex-rs"
-cargo +1.95.0 build --locked --release -p codex-ios-ffi --target "$task_target"
+task_profile=release
+if [ "${CONFIGURATION:-Release}" = Debug ]; then
+  task_profile=dev-small
+fi
+cargo +1.95.0 build --locked --profile "$task_profile" -p codex-ios-ffi --target "$task_target"
 mkdir -p "$task_root/ios/Build/Rust/${PLATFORM_NAME:-iphoneos}"
-cp "$CARGO_TARGET_DIR/$task_target/release/libcodex_ios_ffi.a" "$task_root/ios/Build/Rust/${PLATFORM_NAME:-iphoneos}/"
+cp "$CARGO_TARGET_DIR/$task_target/$task_profile/libcodex_ios_ffi.a" "$task_root/ios/Build/Rust/${PLATFORM_NAME:-iphoneos}/"

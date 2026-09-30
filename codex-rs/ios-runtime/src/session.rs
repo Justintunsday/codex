@@ -13,18 +13,22 @@ pub(crate) const MAX_CONTEXT_BYTES: usize = 32_768;
 const MAX_SESSION_BYTES: u64 = 262_144;
 const MAX_SESSIONS: usize = 200;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Message {
     pub role: String,
     pub text: String,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Session {
     pub id: String,
     pub title: String,
     pub messages: Vec<Message>,
     pub items: Vec<Value>,
+    #[serde(default)]
+    pub engine: Option<crate::AgentEngine>,
+    #[serde(default)]
+    pub core_rollout: Option<String>,
 }
 
 impl Session {
@@ -34,13 +38,15 @@ impl Session {
             title: "New session".into(),
             messages: Vec::new(),
             items: Vec::new(),
+            engine: None,
+            core_rollout: None,
         }
     }
 }
 
 #[derive(Clone)]
 pub(crate) struct SessionStore {
-    root: PathBuf,
+    pub(crate) root: PathBuf,
 }
 
 impl SessionStore {
@@ -111,9 +117,13 @@ impl SessionStore {
         if bytes.len() as u64 > MAX_SESSION_BYTES {
             bail!("session file exceeds storage limit");
         }
-        let session: Session = serde_json::from_slice(&bytes).context("invalid session file")?;
+        let mut session: Session =
+            serde_json::from_slice(&bytes).context("invalid session file")?;
         if session.id != id {
             bail!("session identifier mismatch");
+        }
+        if session.engine.is_none() && !session.items.is_empty() {
+            session.engine = Some(crate::AgentEngine::ResponsesAdapter);
         }
         Ok(session)
     }

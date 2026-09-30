@@ -66,7 +66,7 @@ impl Default for PlatformCapabilities {
             pty: "unsupported",
             git_commit: "unsupported",
             jailbreak: "adapterNotInstalled",
-            agent_engine: "nativeResponsesAdapter",
+            agent_engine: "codexCore",
         }
     }
 }
