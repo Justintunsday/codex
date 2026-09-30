@@ -32,6 +32,8 @@ targets:
       path: Build/Info.plist
       properties:
         CFBundleDisplayName: Codex
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
         UIFileSharingEnabled: true

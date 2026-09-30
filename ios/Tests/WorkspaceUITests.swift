@@ -4,7 +4,7 @@ final class WorkspaceUITests: XCTestCase {
     func testNativeWorkspaceScreens() {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.textFields["promptField"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
         attach("Conversation", app: app)
         for page in ["Files", "Activity", "Settings"] {
             let tab = app.tabBars.buttons[page]

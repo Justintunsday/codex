@@ -31,30 +31,62 @@ pub struct Init {
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum Command {
     CreateSession,
-    RestoreSession { id: String },
+    RestoreSession {
+        id: String,
+    },
     ListSessions,
-    OpenProject { path: PathBuf },
-    ListFiles { path: String },
-    ReadFile { path: String },
-    PreviewChange { path: String, after: String },
-    Review { id: String, decision: Decision },
-    SendPrompt { prompt: String, model: String, endpoint: String, api_key: String },
+    OpenProject {
+        path: PathBuf,
+    },
+    ListFiles {
+        path: String,
+    },
+    ReadFile {
+        path: String,
+    },
+    PreviewChange {
+        path: String,
+        after: String,
+    },
+    Review {
+        id: String,
+        decision: Decision,
+    },
+    SendPrompt {
+        prompt: String,
+        model: String,
+        endpoint: String,
+        api_key: String,
+    },
     Cancel,
-    Lifecycle { state: LifeCycle },
+    Lifecycle {
+        state: LifeCycle,
+    },
     Diagnostics,
     Shutdown,
 }
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum Decision { Approve, Reject }
+pub enum Decision {
+    Approve,
+    Reject,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum LifeCycle { Foreground, Background, MemoryPressure }
+pub enum LifeCycle {
+    Foreground,
+    Background,
+    MemoryPressure,
+}
 
 pub(crate) struct Review {
     change: Change,
@@ -64,13 +96,19 @@ pub(crate) struct Review {
 
 pub(crate) type Reviews = Arc<Mutex<HashMap<String, Review>>>;
 
-pub async fn run(init: Init, mut commands: mpsc::Receiver<Command>, events: mpsc::Sender<Value>) -> anyhow::Result<()> {
+pub async fn run(
+    init: Init,
+    mut commands: mpsc::Receiver<Command>,
+    events: mpsc::Sender<Value>,
+) -> anyhow::Result<()> {
     let store = SessionStore::new(init.home)?;
     let mut session: Option<Session> = None;
     let mut project: Option<Arc<ScopedFiles>> = None;
     let reviews: Reviews = Arc::new(Mutex::new(HashMap::new()));
     let mut turn: Option<JoinHandle<anyhow::Result<Session>>> = None;
-    events.send(json!({"type":"ready", "abi":1, "capabilities":PlatformCapabilities::default()})).await?;
+    events
+        .send(json!({"type":"ready", "abi":1, "capabilities":PlatformCapabilities::default()}))
+        .await?;
     loop {
         tokio::select! {
             result = async {
@@ -130,7 +168,7 @@ pub async fn run(init: Init, mut commands: mpsc::Receiver<Command>, events: mpsc
                         Command::PreviewChange { path, after } => {
                             let files = project.as_ref().context("select a project first")?.clone();
                             let change = files.prepare(&path, after)?;
-                            agent::request_review(change, files, &reviews, &events, None).await?;
+                            agent::request_review(change, files, &reviews, &events, /*answer*/ None).await?;
                         }
                         Command::Review { id, decision } => {
                             let review = reviews.lock().map_err(|_| anyhow::anyhow!("review state poisoned"))?.remove(&id).context("review is no longer active")?;
@@ -175,7 +213,10 @@ pub async fn run(init: Init, mut commands: mpsc::Receiver<Command>, events: mpsc
             }
         }
     }
-    if let Some(active) = turn { active.abort(); let _ = active.await; }
+    if let Some(active) = turn {
+        active.abort();
+        let _ = active.await;
+    }
     Ok(())
 }
 

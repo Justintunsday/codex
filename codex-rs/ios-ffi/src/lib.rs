@@ -23,11 +23,15 @@ struct Engine {
 static ENGINES: OnceLock<Mutex<HashMap<u64, Engine>>> = OnceLock::new();
 static NEXT_HANDLE: AtomicU64 = AtomicU64::new(1);
 
-fn engines() -> &'static Mutex<HashMap<u64, Engine>> { ENGINES.get_or_init(Mutex::default) }
+fn engines() -> &'static Mutex<HashMap<u64, Engine>> {
+    ENGINES.get_or_init(Mutex::default)
+}
 
 /// Returns 1 for this JSON/C ownership contract.
 #[unsafe(no_mangle)]
-pub extern "C" fn codex_abi_version() -> u32 { 1 }
+pub extern "C" fn codex_abi_version() -> u32 {
+    1
+}
 
 /// Starts a dedicated Tokio host thread and returns immediately. Zero indicates invalid input.
 /// Startup errors arrive as events. No network or disk work runs on the caller's UI thread.
@@ -40,27 +44,48 @@ pub unsafe extern "C" fn codex_initialize(config: *const c_char) -> u64 {
         // SAFETY: the caller supplies a valid borrowed C string according to this ABI.
         let input = unsafe { read_input(config) }?;
         let init: Init = serde_json::from_str(input).ok()?;
-        let (commands, command_rx) = mpsc::channel(64);
-        let (event_tx, events) = mpsc::channel(256);
-        let handle = NEXT_HANDLE.fetch_add(1, Ordering::Relaxed);
+        let (commands, command_rx) = mpsc::channel(/*buffer*/ 64);
+        let (event_tx, events) = mpsc::channel(/*buffer*/ 256);
+        let handle = NEXT_HANDLE.fetch_add(/*val*/ 1, Ordering::Relaxed);
         let mut registry = engines().lock().ok()?;
-        if registry.len() >= 4 { return None; }
-        std::thread::Builder::new().name("codex-ios-host".into()).spawn(move || {
-            let reporting = event_tx.clone();
-            let result = catch_unwind(AssertUnwindSafe(|| {
-                let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().map_err(|error| error.to_string())?;
-                runtime.block_on(codex_ios_runtime::run(init, command_rx, event_tx)).map_err(|error| error.to_string())
-            }));
-            let message = match result {
-                Ok(Ok(())) => return,
-                Ok(Err(error)) => error,
-                Err(_) => "Rust runtime panic; restart the runtime to recover saved sessions".to_owned(),
-            };
-            let _ = reporting.try_send(serde_json::json!({"type":"error", "message":message}));
-        }).ok()?;
-        registry.insert(handle, Engine { commands, events: Mutex::new(events) });
+        if registry.len() >= 4 {
+            return None;
+        }
+        std::thread::Builder::new()
+            .name("codex-ios-host".into())
+            .spawn(move || {
+                let reporting = event_tx.clone();
+                let result = catch_unwind(AssertUnwindSafe(|| {
+                    let runtime = tokio::runtime::Builder::new_multi_thread()
+                        .worker_threads(/*val*/ 2)
+                        .enable_all()
+                        .build()
+                        .map_err(|error| error.to_string())?;
+                    runtime
+                        .block_on(codex_ios_runtime::run(init, command_rx, event_tx))
+                        .map_err(|error| error.to_string())
+                }));
+                let message = match result {
+                    Ok(Ok(())) => return,
+                    Ok(Err(error)) => error,
+                    Err(_) => "Rust runtime panic; restart the runtime to recover saved sessions"
+                        .to_owned(),
+                };
+                let _ = reporting.try_send(serde_json::json!({"type":"error", "message":message}));
+            })
+            .ok()?;
+        registry.insert(
+            handle,
+            Engine {
+                commands,
+                events: Mutex::new(events),
+            },
+        );
         Some(handle)
-    })).ok().flatten().unwrap_or(0)
+    }))
+    .ok()
+    .flatten()
+    .unwrap_or(/*default*/ 0)
 }
 
 /// Queues a JSON command. 0 = accepted, 1 = invalid handle/input, 2 = busy/closed, 3 = panic.
@@ -72,12 +97,24 @@ pub unsafe extern "C" fn codex_initialize(config: *const c_char) -> u64 {
 pub unsafe extern "C" fn codex_command(handle: u64, command: *const c_char) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: borrowed from the caller only within this call.
-        let Some(input) = (unsafe { read_input(command) }) else { return 1; };
-        let Ok(command) = serde_json::from_str::<Command>(input) else { return 1; };
-        let Ok(registry) = engines().lock() else { return 3; };
-        let Some(engine) = registry.get(&handle) else { return 1; };
-        match engine.commands.try_send(command) { Ok(()) => 0, Err(_) => 2 }
-    })).unwrap_or(3)
+        let Some(input) = (unsafe { read_input(command) }) else {
+            return 1;
+        };
+        let Ok(command) = serde_json::from_str::<Command>(input) else {
+            return 1;
+        };
+        let Ok(registry) = engines().lock() else {
+            return 3;
+        };
+        let Some(engine) = registry.get(&handle) else {
+            return 1;
+        };
+        match engine.commands.try_send(command) {
+            Ok(()) => 0,
+            Err(_) => 2,
+        }
+    }))
+    .unwrap_or(/*default*/ 3)
 }
 
 /// Returns one owned UTF-8 JSON event, or null if none is available.
@@ -88,8 +125,13 @@ pub extern "C" fn codex_poll_event(handle: u64) -> *mut c_char {
         let registry = engines().lock().ok()?;
         let engine = registry.get(&handle)?;
         let event = engine.events.lock().ok()?.try_recv().ok()?;
-        CString::new(serde_json::to_string(&event).ok()?).ok().map(CString::into_raw)
-    })).ok().flatten().unwrap_or(std::ptr::null_mut())
+        CString::new(serde_json::to_string(&event).ok()?)
+            .ok()
+            .map(CString::into_raw)
+    }))
+    .ok()
+    .flatten()
+    .unwrap_or(std::ptr::null_mut())
 }
 
 /// # Safety
@@ -108,15 +150,21 @@ pub unsafe extern "C" fn codex_string_free(string: *mut c_char) {
 #[unsafe(no_mangle)]
 pub extern "C" fn codex_shutdown(handle: u64) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
-        if let Ok(mut registry) = engines().lock() { registry.remove(&handle); }
+        if let Ok(mut registry) = engines().lock() {
+            registry.remove(&handle);
+        }
     }));
 }
 
 unsafe fn read_input<'a>(input: *const c_char) -> Option<&'a str> {
-    if input.is_null() { return None; }
+    if input.is_null() {
+        return None;
+    }
     // SAFETY: guaranteed by the public ABI's valid NUL-terminated pointer precondition.
     let bytes = unsafe { CStr::from_ptr(input) }.to_bytes();
-    if bytes.len() > codex_ios_runtime::MAX_COMMAND_BYTES { return None; }
+    if bytes.len() > codex_ios_runtime::MAX_COMMAND_BYTES {
+        return None;
+    }
     std::str::from_utf8(bytes).ok()
 }
 

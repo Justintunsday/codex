@@ -33,7 +33,10 @@ pub trait FileSystemBackend: Send + Sync {
 /// An execution adapter must report unsupported operations instead of invoking a desktop shell.
 /// Future remote or separately installed enhanced adapters implement this boundary.
 pub trait ProcessBackend: Send + Sync {
-    fn execute(&self, command: &str) -> impl std::future::Future<Output = Result<String, PlatformError>> + Send;
+    fn execute(
+        &self,
+        command: &str,
+    ) -> impl std::future::Future<Output = Result<String, PlatformError>> + Send;
 }
 
 pub struct AppSandbox;

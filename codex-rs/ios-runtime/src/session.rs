@@ -29,18 +29,29 @@ pub(crate) struct Session {
 
 impl Session {
     pub(crate) fn new() -> Self {
-        Self { id: Uuid::new_v4().to_string(), title: "New session".into(), messages: Vec::new(), items: Vec::new() }
+        Self {
+            id: Uuid::new_v4().to_string(),
+            title: "New session".into(),
+            messages: Vec::new(),
+            items: Vec::new(),
+        }
     }
 }
 
 #[derive(Clone)]
-pub(crate) struct SessionStore { root: PathBuf }
+pub(crate) struct SessionStore {
+    root: PathBuf,
+}
 
 impl SessionStore {
     pub(crate) fn new(root: PathBuf) -> anyhow::Result<Self> {
-        if !root.is_absolute() { bail!("Application Support path must be absolute"); }
+        if !root.is_absolute() {
+            bail!("Application Support path must be absolute");
+        }
         std::fs::create_dir_all(&root)?;
-        Ok(Self { root: root.canonicalize()? })
+        Ok(Self {
+            root: root.canonicalize()?,
+        })
     }
 
     pub(crate) fn save(&self, session: &Session) -> anyhow::Result<()> {
@@ -49,12 +60,18 @@ impl SessionStore {
         if !path.try_exists()? && std::fs::read_dir(&self.root)?.count() >= MAX_SESSIONS {
             bail!("session limit reached (200); export or remove old sessions first");
         }
-        if serde_json::to_vec(&session.items)?.len() > MAX_CONTEXT_BYTES { bail!("session context limit reached; start a new session"); }
+        if serde_json::to_vec(&session.items)?.len() > MAX_CONTEXT_BYTES {
+            bail!("session context limit reached; start a new session");
+        }
         for item in &session.items {
-            if serde_json::to_vec(item)?.len() > 8192 { bail!("individual context item exceeds the 8 KiB mobile limit"); }
+            if serde_json::to_vec(item)?.len() > 8192 {
+                bail!("individual context item exceeds the 8 KiB mobile limit");
+            }
         }
         let bytes = serde_json::to_vec(session)?;
-        if bytes.len() as u64 > MAX_SESSION_BYTES { bail!("session storage limit reached"); }
+        if bytes.len() as u64 > MAX_SESSION_BYTES {
+            bail!("session storage limit reached");
+        }
         let mut file = tempfile::NamedTempFile::new_in(&self.root)?;
         file.write_all(&bytes)?;
         file.as_file().sync_all()?;
@@ -65,11 +82,22 @@ impl SessionStore {
     pub(crate) fn load(&self, id: &str) -> anyhow::Result<Session> {
         let mut session = self.read(id)?;
         // Append interrupted tool results so a killed app never replays an unapproved write.
-        let pending: Vec<String> = session.items.iter().filter(|item| item["type"] == "function_call")
+        let pending: Vec<String> = session
+            .items
+            .iter()
+            .filter(|item| item["type"] == "function_call")
             .filter_map(|item| item["call_id"].as_str())
-            .filter(|id| !session.items.iter().any(|item| item["type"] == "function_call_output" && item["call_id"] == *id))
-            .map(str::to_owned).collect();
-        for call_id in pending { session.items.push(json!({"type":"function_call_output", "call_id":call_id, "output":"Interrupted; no pending write was applied. Request review again."})); }
+            .filter(|id| {
+                !session
+                    .items
+                    .iter()
+                    .any(|item| item["type"] == "function_call_output" && item["call_id"] == *id)
+            })
+            .map(str::to_owned)
+            .collect();
+        for call_id in pending {
+            session.items.push(json!({"type":"function_call_output", "call_id":call_id, "output":"Interrupted; no pending write was applied. Request review again."}));
+        }
         self.save(&session)?;
         Ok(session)
     }
@@ -77,10 +105,16 @@ impl SessionStore {
     fn read(&self, id: &str) -> anyhow::Result<Session> {
         let id = Uuid::parse_str(id)?.to_string();
         let mut bytes = Vec::new();
-        std::fs::File::open(self.root.join(format!("{id}.json")))?.take(MAX_SESSION_BYTES + 1).read_to_end(&mut bytes)?;
-        if bytes.len() as u64 > MAX_SESSION_BYTES { bail!("session file exceeds storage limit"); }
+        std::fs::File::open(self.root.join(format!("{id}.json")))?
+            .take(MAX_SESSION_BYTES + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_SESSION_BYTES {
+            bail!("session file exceeds storage limit");
+        }
         let session: Session = serde_json::from_slice(&bytes).context("invalid session file")?;
-        if session.id != id { bail!("session identifier mismatch"); }
+        if session.id != id {
+            bail!("session identifier mismatch");
+        }
         Ok(session)
     }
 

@@ -42,7 +42,10 @@ impl ScopedFiles {
 
     fn resolve(&self, relative: &str) -> Result<PathBuf, PlatformError> {
         let relative = Path::new(relative);
-        if relative.components().any(|component| !matches!(component, Component::Normal(_) | Component::CurDir)) {
+        if relative
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_) | Component::CurDir))
+        {
             return Err(PlatformError::OutsideProject);
         }
         // Refuse symlinks, including links that point back into the project: users must
@@ -51,7 +54,9 @@ impl ScopedFiles {
         for component in relative.components() {
             result.push(component);
             match result.symlink_metadata() {
-                Ok(metadata) if metadata.file_type().is_symlink() => return Err(PlatformError::OutsideProject),
+                Ok(metadata) if metadata.file_type().is_symlink() => {
+                    return Err(PlatformError::OutsideProject);
+                }
                 Ok(_) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => return Err(error.into()),
@@ -76,13 +81,20 @@ impl FileSystemBackend for ScopedFiles {
                 continue;
             }
             let path = entry.path();
-            let relative = path.strip_prefix(&self.root).map_err(|_| PlatformError::OutsideProject)?;
+            let relative = path
+                .strip_prefix(&self.root)
+                .map_err(|_| PlatformError::OutsideProject)?;
             entries.push(FileEntry {
                 path: relative.to_string_lossy().replace('\\', "/"),
                 is_directory: file_type.is_dir(),
             });
         }
-        entries.sort_by(|left, right| right.is_directory.cmp(&left.is_directory).then(left.path.cmp(&right.path)));
+        entries.sort_by(|left, right| {
+            right
+                .is_directory
+                .cmp(&left.is_directory)
+                .then(left.path.cmp(&right.path))
+        });
         Ok(entries)
     }
 
@@ -105,21 +117,38 @@ impl FileSystemBackend for ScopedFiles {
         }
         let path = self.resolve(relative)?;
         let existed = path.try_exists()?;
-        let before = if existed { self.read(relative)? } else { String::new() };
-        let diff = TextDiff::from_lines(&before, &after).unified_diff().header("before", "after").to_string();
-        Ok(Change { path: relative.to_owned(), before, after, diff, existed })
+        let before = if existed {
+            self.read(relative)?
+        } else {
+            String::new()
+        };
+        let diff = TextDiff::from_lines(&before, &after)
+            .unified_diff()
+            .header("before", "after")
+            .to_string();
+        Ok(Change {
+            path: relative.to_owned(),
+            before,
+            after,
+            diff,
+            existed,
+        })
     }
 
     fn apply(&self, change: &Change) -> Result<(), PlatformError> {
         let path = self.resolve(&change.path)?;
-        if path.try_exists()? != change.existed || (change.existed && self.read(&change.path)? != change.before) {
+        if path.try_exists()? != change.existed
+            || (change.existed && self.read(&change.path)? != change.before)
+        {
             return Err(PlatformError::Conflict);
         }
         let parent = path.parent().ok_or(PlatformError::OutsideProject)?;
         // No implicit directory creation: every component must already be authorized.
         let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
         if change.existed {
-            temporary.as_file().set_permissions(std::fs::metadata(&path)?.permissions())?;
+            temporary
+                .as_file()
+                .set_permissions(std::fs::metadata(&path)?.permissions())?;
         }
         temporary.write_all(change.after.as_bytes())?;
         temporary.as_file().sync_all()?;
