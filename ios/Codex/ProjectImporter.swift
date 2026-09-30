@@ -37,7 +37,7 @@ enum ProjectImporter {
             var copyError: Error?
             coordinator.coordinate(readingItemAt: source, options: .withoutChanges, error: &coordinationError) { root in
                 do {
-                    guard let iterator = manager.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey], errorHandler: { _, _ in false }) else {
+                    guard let iterator = manager.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey], errorHandler: { _, error in copyError = error; return false }) else {
                         throw CocoaError(.fileReadNoPermission)
                     }
                     var count = 0

@@ -31,7 +31,7 @@ jobs:
           brew install xcodegen just
           rustup toolchain install 1.95.0 --profile minimal --component rustfmt,clippy
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim --toolchain 1.95.0
-          cargo +1.95.0 install --locked cargo-nextest
+          curl -LsSf https://get.nexte.st/0.9/mac | tar zxf - -C "$HOME/.cargo/bin"
       - name: Test mobile crates
         run: just test -p codex-ios-platform -p codex-ios-runtime -p codex-ios-ffi
       - name: Build arm64 device app
@@ -101,9 +101,10 @@ jobs:
         run: |
           mkdir -p ios/Build/Audit
           python3 ios/Scripts/audit-platform.py
-          rustup target add aarch64-apple-ios
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup target add aarch64-apple-ios --toolchain 1.95.0
           cd codex-rs
-          cargo tree --locked -p codex-core --target aarch64-apple-ios > ../ios/Build/Audit/core-dependencies.txt
+          cargo +1.95.0 tree --locked -p codex-core --target aarch64-apple-ios > ../ios/Build/Audit/core-dependencies.txt
       - name: Check full upstream core for arm64 iOS
         continue-on-error: true
         id: core
@@ -112,7 +113,7 @@ jobs:
           cd codex-rs
           export SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
           export IPHONEOS_DEPLOYMENT_TARGET=16.0
-          cargo check --locked -p codex-core --target aarch64-apple-ios 2>&1 | tee ../ios/Build/Audit/core-check.log
+          cargo +1.95.0 check --locked -p codex-core --target aarch64-apple-ios 2>&1 | tee ../ios/Build/Audit/core-check.log
       - name: Record core check outcome
         if: always()
         run: |

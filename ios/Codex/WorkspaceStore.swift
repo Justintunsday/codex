@@ -37,7 +37,12 @@ final class WorkspaceStore: ObservableObject {
             try manager.createDirectory(at: support, withIntermediateDirectories: true)
             try manager.createDirectory(at: projectRoot, withIntermediateDirectories: true)
             if let data = try? Data(contentsOf: support.appendingPathComponent("projects.json")) {
+                guard data.count <= 1_048_576 else { throw CocoaError(.fileReadTooLarge) }
                 projects = try JSONDecoder().decode([Project].self, from: data)
+                guard projects.count <= 50, projects.allSatisfy({ UUID(uuidString: $0.folder) != nil }) else { throw CocoaError(.fileReadCorruptFile) }
+                if let id = UserDefaults.standard.string(forKey: "projectID") {
+                    project = projects.first { $0.id.uuidString == id }
+                }
             }
             bridge = RustBridge(home: support.appendingPathComponent("Sessions")) { [weak self] event in self?.receive(event) }
         } catch { self.error = error.localizedDescription }
@@ -116,6 +121,7 @@ final class WorkspaceStore: ObservableObject {
     func selectProject(_ selected: Project) {
         guard !working else { error = "Cancel the task before changing projects."; return }
         project = selected
+        UserDefaults.standard.set(selected.id.uuidString, forKey: "projectID")
         folder = ""
         file = nil
         command("openProject", ["path": projectRoot.appendingPathComponent(selected.folder).path])
@@ -139,6 +145,7 @@ final class WorkspaceStore: ObservableObject {
         case "ready":
             capabilities = event.capabilities
             status = "idle"
+            if let project { selectProject(project) }
             command("listSessions")
             if let id = UserDefaults.standard.string(forKey: "sessionID") { restore(id) }
             else { command("createSession") }
