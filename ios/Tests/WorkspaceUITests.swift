@@ -12,6 +12,17 @@ final class WorkspaceUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars[page].waitForExistence(timeout: 5))
             attach(page, app: app)
         }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        attach("Landscape settings", app: app)
+        XCUIDevice.shared.orientation = .portrait
+    }
+
+    func testDarkAppearanceWithLargeDynamicType() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleInterfaceStyle", "Dark", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
+        attach("Dark conversation with large text", app: app)
     }
 
     private func attach(_ name: String, app: XCUIApplication) {
