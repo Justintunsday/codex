@@ -257,10 +257,20 @@ async fn cancelling_core_at_file_review_preserves_rollout_and_never_writes() -> 
         .filter_map(|tool| tool["name"].as_str())
         .collect();
     assert!(names.contains(&"propose_change"), "tools: {names:?}");
-    assert!(
-        !names.contains(&"apply_patch") && !names.contains(&"exec_command"),
-        "tools: {names:?}"
-    );
+    for unsupported in [
+        "apply_patch",
+        "exec_command",
+        "exec",
+        "wait",
+        "spawn_agent",
+        "request_user_input",
+        "request_user_input_async",
+    ] {
+        assert!(
+            !names.contains(&unsupported),
+            "unsupported tool {unsupported} in {names:?}"
+        );
+    }
     assert!(!root.path().join("Core/auth.json").exists());
     Ok(())
 }

@@ -37,7 +37,11 @@ use codex_protocol::dynamic_tools::DynamicToolResponse;
 use codex_protocol::dynamic_tools::DynamicToolSpec;
 use codex_protocol::items::AgentMessageContent;
 use codex_protocol::items::TurnItem;
+use codex_protocol::openai_models::ConfigShellToolType;
+use codex_protocol::openai_models::ModelsResponse;
+use codex_protocol::openai_models::ToolMode;
 use codex_protocol::protocol::EventMsg;
+use codex_protocol::protocol::MultiAgentVersion;
 use codex_protocol::protocol::Op;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::user_input::UserInput;
@@ -143,6 +147,7 @@ pub(crate) async fn run_turn(
         Feature::ShellTool,
         Feature::UnifiedExec,
         Feature::CodeMode,
+        Feature::CodeModeOnly,
         Feature::CodeModeHost,
         Feature::CodeModePrewarm,
         Feature::CodexHooks,
@@ -160,6 +165,9 @@ pub(crate) async fn run_turn(
         Feature::ViewImage,
         Feature::RequestPermissionsTool,
         Feature::ApiKeyModelDiscovery,
+        Feature::SendMessageToUserAsync,
+        Feature::SleepTool,
+        Feature::CurrentTimeReminder,
     ] {
         config.features.disable(feature)?;
     }
@@ -221,6 +229,26 @@ pub(crate) async fn run_turn(
     let environments = Arc::new(EnvironmentManager::without_environments(
         config.http_client_factory(),
     ));
+    // Model-selected execution modes take precedence over feature flags upstream.
+    // Preserve model/transport/context metadata, while selecting only installed iOS tools.
+    let upstream_models = codex_core::build_models_manager(&config, auth.clone());
+    let mut model = upstream_models
+        .get_model_info(
+            config.model.as_deref().context("selected model")?,
+            &config.to_models_manager_config(),
+        )
+        .await;
+    model.tool_mode = Some(ToolMode::Direct);
+    model.multi_agent_version = Some(MultiAgentVersion::Disabled);
+    model.shell_type = ConfigShellToolType::Disabled;
+    model.apply_patch_tool_type = None;
+    model.experimental_supported_tools.clear();
+    model.node_repl_disabled = true;
+    config.model_catalog = Some(ModelsResponse {
+        models: vec![model],
+    });
+    config.agents_enabled = false;
+    config.experimental_request_user_input_enabled = false;
     let manager = Arc::new(ThreadManager::new(
         &config,
         auth.clone(),
