@@ -82,6 +82,14 @@ jobs:
           IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           IOS_EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD }}
         run: bash ios/Scripts/sign-app.sh
+      - name: Export UI screenshots
+        if: always()
+        run: |
+          for result in ios/Build/UI-*.xcresult; do
+            if [ -d "$result" ]; then
+              xcrun xcresulttool export attachments --path "$result" --output-path "ios/Build/Screenshots/$(basename "$result" .xcresult)"
+            fi
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -92,6 +100,7 @@ jobs:
             ios/Build/Codex-unsigned.ipa
             ios/Build/Signed/*.ipa
             ios/Build/*.xcresult
+            ios/Build/Screenshots
       - name: Build summary
         if: always()
         run: |

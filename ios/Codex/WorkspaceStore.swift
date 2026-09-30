@@ -95,7 +95,9 @@ final class WorkspaceStore: ObservableObject {
                     var data: [Model]
                 }
                 // URLSession uses platform TLS/ATS. Model discovery never reads project files.
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let connection = URLSession(configuration: .ephemeral, delegate: ModelConnectionDelegate(), delegateQueue: nil)
+                defer { connection.invalidateAndCancel() }
+                let (data, response) = try await connection.data(for: request)
                 guard let response = response as? HTTPURLResponse, response.statusCode == 200,
                       data.count <= 1_048_576 else { throw URLError(.badServerResponse) }
                 models = Array(try JSONDecoder().decode(ModelList.self, from: data).data.map(\.id).sorted().prefix(200))
@@ -180,5 +182,12 @@ final class WorkspaceStore: ObservableObject {
     private func log(_ category: String, _ text: String) {
         activity.append(ActivityEntry(category: category, text: String(text.prefix(2048))))
         if activity.count > 500 { activity.removeFirst(activity.count - 500) }
+    }
+}
+
+private final class ModelConnectionDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
     }
 }
