@@ -20,9 +20,60 @@ final class WorkspaceUITests: XCTestCase {
     func testDarkAppearanceWithLargeDynamicType() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleInterfaceStyle", "Dark", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launchEnvironment["CODEX_UI_TEST_APPEARANCE"] = "dark"
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
         attach("Dark conversation with large text", app: app)
+    }
+
+    func testReviewedEditSurvivesRestartAndInterruptedReviewDoesNotWrite() {
+        let app = XCUIApplication()
+        app.launchEnvironment["CODEX_UI_TEST_PROJECT"] = "1"
+        app.launchEnvironment["CODEX_UI_TEST_RESET"] = "1"
+        app.launch()
+        openFixtureFile(app)
+        XCTAssertEqual(app.staticTexts["fileContents"].label, "Hello from the project.\n")
+        app.buttons["Edit"].tap()
+        let editor = app.textViews["fileEditor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        editor.typeText("Reviewed edit.\n")
+        app.buttons["reviewFileChange"].tap()
+        XCTAssertTrue(app.buttons["approveChange"].waitForExistence(timeout: 5))
+        attach("File diff awaiting approval", app: app)
+        app.buttons["approveChange"].tap()
+        let file = app.staticTexts["fileContents"]
+        let saved = NSPredicate(format: "label CONTAINS %@", "Reviewed edit.")
+        expectation(for: saved, evaluatedWith: file)
+        waitForExpectations(timeout: 5)
+        attach("Saved file", app: app)
+
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "CODEX_UI_TEST_RESET")
+        app.launch()
+        openFixtureFile(app)
+        XCTAssertTrue(app.staticTexts["fileContents"].label.contains("Reviewed edit."))
+        let baseline = app.staticTexts["fileContents"].label
+        app.buttons["Edit"].tap()
+        app.textViews["fileEditor"].tap()
+        app.textViews["fileEditor"].typeText("Unapproved edit.\n")
+        app.buttons["reviewFileChange"].tap()
+        XCTAssertTrue(app.buttons["approveChange"].waitForExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        openFixtureFile(app)
+        XCTAssertEqual(app.staticTexts["fileContents"].label, baseline)
+        attach("Restart retains approved file", app: app)
+    }
+
+    private func openFixtureFile(_ app: XCUIApplication) {
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
+        let tab = app.tabBars.buttons["Files"]
+        if tab.exists { tab.tap() } else { app.buttons["Files"].firstMatch.tap() }
+        let file = app.staticTexts["hello.txt"].firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 10))
+        file.tap()
+        XCTAssertTrue(app.staticTexts["fileContents"].waitForExistence(timeout: 5))
     }
 
     private func attach(_ name: String, app: XCUIApplication) {

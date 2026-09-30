@@ -10,6 +10,7 @@ struct SessionSnapshot: Decodable {
     var id: String
     var title: String
     var messages: [ChatMessage]
+    var engine: String?
 }
 
 struct SessionSummary: Decodable, Identifiable {

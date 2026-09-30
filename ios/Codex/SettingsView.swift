@@ -26,8 +26,11 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Runtime") {
-                LabeledContent("Engine", value: "Native Responses adapter")
-                Text("Uses upstream Codex transport and protocol. Full Codex core migration is still in progress.").font(.caption).foregroundStyle(.secondary)
+                Picker("Agent", selection: $store.engine) {
+                    Text("Codex agent").tag("codexCore")
+                    Text("Legacy mobile sessions").tag("responsesAdapter")
+                }.disabled(store.working)
+                Text("Create a new session to change agents. Older mobile sessions keep their original history format.").font(.caption).foregroundStyle(.secondary)
                 LabeledContent("Task", value: store.status)
                 LabeledContent("File access", value: "Imported projects")
                 LabeledContent("Shell / PTY", value: store.capabilities?.process ?? "Detecting…")

@@ -2,7 +2,9 @@
 
 This directory contains a real SwiftUI iPhone/iPad app and a Rust static-library bridge. The deployment target is iOS 16.0; device and simulator builds are arm64. Compatibility generations are 16, 17, 18 and 26. Business views only use the iOS 16 baseline.
 
-**This is an incomplete port, not a finished replacement for the full Codex agent.** The working engine is a bounded mobile Responses adapter reusing `codex-api`, `codex-http-client` and `codex-protocol`. It does not yet embed `codex-core`, its desktop agent/session/config/tool orchestration, or its V8 code-mode runtime. The CI job separately attempts an actual `aarch64-apple-ios` check of the unchanged full core and uploads the result and platform inventory. A passing adapter build does not mean that full-core check passes.
+The default engine embeds the unchanged upstream `codex-core`: ThreadManager, configuration loading, model communication, agent orchestration and its native rollout/session format. iOS owns the runtime lifecycle and exposes scoped file tools through Core's dynamic-tool protocol. Desktop executor environments are not selected in the app sandbox. Code-mode requires a separate process host and is reported as unavailable. Earlier mobile Responses sessions retain their original engine and history; changing engines requires a new session.
+
+**This is still an incomplete platform port.** The unchanged full core passed the actual `aarch64-apple-ios` check in [run 36747720140](https://github.com/Justintunsday/codex/actions/runs/36747720140). The embedded integration additionally requires its own tests and an app archive to pass; a successful `cargo check` alone does not validate device execution. Native Git, terminal backends, account OAuth and the optional enhanced adapter remain outstanding.
 
 ## Current implementation
 
@@ -12,20 +14,23 @@ Projects are explicitly imported as app-owned copies through Document Picker and
 
 The C ABI has six functions: version, initialize, command, poll event, free string and shutdown (version is a query). JSON commands cover create/restore/list sessions, prompt, cancel, lifecycle, project/files, preview/review and diagnostics. Handles are registry IDs, not borrowed Swift object pointers. Command/event queues are bounded (64/256). Rust strings are copied and freed before Swift decoding. Swift polls off the main thread. Tokio runs on a dedicated host thread with two workers. Panics are contained at the ABI/task boundaries; `panic=abort` builds are not supported.
 
-Background and memory-pressure events cancel work; the app does not claim unlimited iOS background execution. Every text delta is checkpointed before delivery. Recovery appends failure results for interrupted tool calls and never automatically applies an unapproved write. Context is capped at 32 KiB, individual prompts at 8 KiB, assistant output at 32 KiB, and tool loops at 12 calls. The app reports limits and asks for a new session instead of silently rewriting context. Tool content can exceed 1,000 tokens and requires manual model-context review before merging.
+Background and memory-pressure events cancel work and request upstream thread shutdown. The app does not claim unlimited iOS background execution. Every text delta is checkpointed before delivery; Core rollouts are flushed at tool/turn boundaries. Cold resume uses Core's rollout loader and retains its history recovery behavior. Pending native writes never replay without approval. Display history is capped at 256 KiB, individual prompts at 8 KiB and assistant messages at 32 KiB. Core rollout restores are capped at 16 MiB; Core owns model context management. Native dynamic tools are capped at 12 calls per turn, 8 KiB arguments and 1,800-character results. Legacy Responses sessions keep their 32 KiB context / 12-response-round limits. Tool content can exceed 1,000 tokens and requires manual model-context review before merging.
 
-Secrets are stored with Keychain `WhenUnlockedThisDeviceOnly`; no API key is persisted in Documents, preferences, Rust sessions, or diagnostics. Requests require HTTPS. ATS remains enabled; certificate verification and upstream TLS behavior remain intact. HTTP/2/SSE use the upstream transport. WebSocket support in the upstream dependency graph has not been exercised by the mobile engine.
+Secrets are stored with Keychain `WhenUnlockedThisDeviceOnly`; the bridge supplies Core's ephemeral in-memory credential store. No API key is persisted in Documents, preferences, Rust sessions, or diagnostics. Requests require HTTPS. ATS remains enabled; certificate verification and upstream TLS behavior remain intact. HTTP/2/SSE use the upstream transport. The mobile provider selects HTTP streaming; WebSockets have not been validated on devices.
 
 ## Not implemented yet
 
-- Embedding full upstream core and preserving its exact agent behavior/configuration/rollout formats.
 - Remote process/tool adapter, terminal emulator/PTY, native Git status/diff/commit.
 - ChatGPT OAuth/account sign-in, refresh and account migration.
 - Optional enhanced runtime: the capability boundary reports `adapterNotInstalled`; there is no privilege escalation or jailbreak implementation.
 - In-place editing of external provider projects, project archive import/export, session deletion/export and resumable network tasks after background termination.
 - Device validation on iOS 16, 17, 18 and 26, including Dynamic Type, rotation, background kills, TLS streaming and memory pressure.
 
-The UI labels unsupported backends explicitly. It never assumes a shell, git, compiler, package manager, daemon manager or access to the root filesystem.
+The UI labels unsupported backends explicitly. It never assumes a shell, git, compiler, package manager, daemon manager or access to the root filesystem. Imported project instructions and desktop plugins are not automatically loaded into the native tool adapter.
+
+## Agent behavior validation
+
+The targeted Rust tests cover upstream streaming and completed-item responses, cold resume with prior model context, ephemeral credentials, a dynamic file-tool review followed by cancellation, rollout readability after interruption, and the absence of desktop executor tools. Existing actor tests cover approval-before-write and persisted sessions; file review has an `insta` event snapshot. Native UI tests cover file approval, saved content after app restart, and termination during an unapproved review, as well as phone/tablet navigation, rotation and large text. Live API/device networking and all four supported OS generations still require device validation.
 
 ## GitHub build and installation
 
@@ -41,4 +46,4 @@ Rust's target requirements and deployment environment are documented in the [Rus
 
 ## Reviewable landing stages
 
-The complete application is larger than the repository's 800-line review guidance. The smallest coherent stage is the confined platform crate and its tests; subsequent stages are the persistence/Responses adapter and FFI, then native views and build automation. The current branch contains these stages for end-to-end compilation; split commits/PRs before upstream review. Existing CLI APIs and rollouts are unchanged, and existing desktop core modules are not modified.
+The complete application is larger than the repository's 800-line review guidance. The smallest coherent stage is the confined platform crate and its tests; subsequent stages are persistence/FFI, native views/build automation, then embedded Core integration. Follow-up commits separate the agent integration from native lifecycle/UI tests. Split the initial scaffold into these reviewable stages before upstream review. Existing CLI APIs and rollouts are unchanged, and existing desktop core modules are not modified.

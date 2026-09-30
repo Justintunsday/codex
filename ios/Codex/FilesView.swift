@@ -55,7 +55,7 @@ struct FileEditorView: View {
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .accessibilityIdentifier("fileEditor")
                 } else {
-                    ScrollView([.horizontal, .vertical]) { Text(store.file?.text ?? "").font(Design.code).textSelection(.enabled).padding(16).frame(maxWidth: .infinity, alignment: .leading) }
+                    ScrollView([.horizontal, .vertical]) { Text(store.file?.text ?? "").font(Design.code).textSelection(.enabled).padding(16).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("fileContents") }
                 }
             } else { ProgressView("Reading file…") }
         }
@@ -65,7 +65,7 @@ struct FileEditorView: View {
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if editing {
-                    Button("Review") { store.command("previewChange", ["path": path, "after": text]); editing = false }.disabled(store.working)
+                    Button("Review") { store.command("previewChange", ["path": path, "after": text]); editing = false }.disabled(store.working).accessibilityIdentifier("reviewFileChange")
                 } else {
                     Button("Edit") { text = store.file?.text ?? ""; editing = true }.disabled(store.file?.path != path || store.working)
                 }
@@ -99,8 +99,12 @@ struct ReviewView: View {
             .navigationTitle(review.change.path)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Reject") { store.command("review", ["id": review.id, "decision": "reject"]) } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save change") { store.command("review", ["id": review.id, "decision": "approve"]) }.accessibilityIdentifier("approveChange") }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Reject") { store.command("review", ["id": review.id, "decision": "reject"]) }.accessibilityIdentifier("rejectChange")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save change") { store.command("review", ["id": review.id, "decision": "approve"]) }.accessibilityIdentifier("approveChange")
+                }
             }
         }
     }

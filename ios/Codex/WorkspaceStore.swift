@@ -19,28 +19,44 @@ final class WorkspaceStore: ObservableObject {
     @Published var importing = false
     @Published var endpoint: String
     @Published var model: String
+    @Published var engine = "codexCore"
     @Published var models: [String] = []
     @Published var loadingModels = false
     private var bridge: RustBridge?
     private let support: URL
+    private let preferences: UserDefaults
     let projectRoot: URL
     var working: Bool { status == "working" }
     var projectURL: URL? { project.map { projectRoot.appendingPathComponent($0.folder) } }
 
     init() {
         let manager = FileManager.default
-        support = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Codex", isDirectory: true)
-        projectRoot = manager.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Projects", isDirectory: true)
-        endpoint = UserDefaults.standard.string(forKey: "endpoint") ?? "https://api.openai.com/v1"
-        model = UserDefaults.standard.string(forKey: "model") ?? ""
+        var supportName = "Codex"
+        var projectName = "Projects"
+        var preferences = UserDefaults.standard
+        #if DEBUG
+        if UITestProject.enabled {
+            supportName = "CodexUITests"
+            projectName = "UITestProjects"
+            preferences = UserDefaults(suiteName: "org.codex.native-ios.uitests")!
+        }
+        #endif
+        self.preferences = preferences
+        support = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(supportName, isDirectory: true)
+        projectRoot = manager.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(projectName, isDirectory: true)
+        endpoint = preferences.string(forKey: "endpoint") ?? "https://api.openai.com/v1"
+        model = preferences.string(forKey: "model") ?? ""
         do {
             try manager.createDirectory(at: support, withIntermediateDirectories: true)
             try manager.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            #if DEBUG
+            if UITestProject.enabled { try UITestProject.prepare(support: support, projects: projectRoot, preferences: preferences) }
+            #endif
             if let data = try? Data(contentsOf: support.appendingPathComponent("projects.json")) {
                 guard data.count <= 1_048_576 else { throw CocoaError(.fileReadTooLarge) }
                 projects = try JSONDecoder().decode([Project].self, from: data)
                 guard projects.count <= 50, projects.allSatisfy({ UUID(uuidString: $0.folder) != nil }) else { throw CocoaError(.fileReadCorruptFile) }
-                if let id = UserDefaults.standard.string(forKey: "projectID") {
+                if let id = preferences.string(forKey: "projectID") {
                     project = projects.first { $0.id.uuidString == id }
                 }
             }
@@ -61,7 +77,7 @@ final class WorkspaceStore: ObservableObject {
             guard !key.isEmpty, !model.isEmpty else { error = "Set an API key and choose a model in Settings."; return false }
             guard !working, session != nil else { return false }
             thinking = ""
-            command("sendPrompt", ["prompt": prompt, "model": model, "endpoint": endpoint, "apiKey": key])
+            command("sendPrompt", ["prompt": prompt, "model": model, "endpoint": endpoint, "apiKey": key, "engine": engine])
             return true
         } catch { self.error = error.localizedDescription; return false }
     }
@@ -74,8 +90,8 @@ final class WorkspaceStore: ObservableObject {
                 return
             }
             try Keychain.save(key)
-            UserDefaults.standard.set(endpoint, forKey: "endpoint")
-            UserDefaults.standard.set(model, forKey: "model")
+            preferences.set(endpoint, forKey: "endpoint")
+            preferences.set(model, forKey: "model")
             log("configuration", "Settings saved; credential is in Keychain.")
         } catch { self.error = error.localizedDescription }
     }
@@ -97,10 +113,16 @@ final class WorkspaceStore: ObservableObject {
                 // URLSession uses platform TLS/ATS. Model discovery never reads project files.
                 let connection = URLSession(configuration: .ephemeral, delegate: ModelConnectionDelegate(), delegateQueue: nil)
                 defer { connection.invalidateAndCancel() }
-                let (data, response) = try await connection.data(for: request)
-                guard let response = response as? HTTPURLResponse, response.statusCode == 200,
-                      data.count <= 1_048_576 else { throw URLError(.badServerResponse) }
-                models = Array(try JSONDecoder().decode(ModelList.self, from: data).data.map(\.id).sorted().prefix(200))
+                let (bytes, response) = try await connection.bytes(for: request)
+                guard let response = response as? HTTPURLResponse, response.statusCode == 200 else { throw URLError(.badServerResponse) }
+                var data = Data()
+                for try await byte in bytes {
+                    guard data.count < 1_048_576 else { throw URLError(.dataLengthExceedsMaximum) }
+                    data.append(byte)
+                }
+                let identifiers = try JSONDecoder().decode(ModelList.self, from: data).data.map(\.id)
+                    .filter { !$0.isEmpty && $0.utf8.count <= 128 }
+                models = Array(Set(identifiers).sorted().prefix(200))
             } catch { self.error = "Model discovery failed: \(error.localizedDescription)" }
         }
     }
@@ -123,7 +145,7 @@ final class WorkspaceStore: ObservableObject {
     func selectProject(_ selected: Project) {
         guard !working else { error = "Cancel the task before changing projects."; return }
         project = selected
-        UserDefaults.standard.set(selected.id.uuidString, forKey: "projectID")
+        preferences.set(selected.id.uuidString, forKey: "projectID")
         folder = ""
         file = nil
         command("openProject", ["path": projectRoot.appendingPathComponent(selected.folder).path])
@@ -149,11 +171,12 @@ final class WorkspaceStore: ObservableObject {
             status = "idle"
             if let project { selectProject(project) }
             command("listSessions")
-            if let id = UserDefaults.standard.string(forKey: "sessionID") { restore(id) }
+            if let id = preferences.string(forKey: "sessionID") { restore(id) }
             else { command("createSession") }
         case "session":
             session = event.session
-            if let id = session?.id { UserDefaults.standard.set(id, forKey: "sessionID") }
+            if let selected = session?.engine { engine = selected }
+            if let id = session?.id { preferences.set(id, forKey: "sessionID") }
         case "sessions": sessions = event.sessions ?? []
         case "files": files = event.files ?? []
         case "file": file = LoadedFile(path: event.path ?? "", text: event.text ?? "")
@@ -172,6 +195,7 @@ final class WorkspaceStore: ObservableObject {
             if let file { command("readFile", ["path": file.path]) }
             browse(folder)
         case "tool": log("tool", "\(event.name ?? "Tool") · \(event.status ?? "")")
+        case "coreEvent": log("agent", event.name ?? "Event")
         case "error": error = event.message; log("error", event.message ?? "Unknown runtime error")
         case "diagnostics": capabilities = event.capabilities
         case "project": log("project", "Authorized imported project opened.")
