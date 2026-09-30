@@ -27,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
+        id: build-cache
         with:
           path: |
             codex-rs/target
@@ -102,6 +103,14 @@ jobs:
             ios/Build/Signed/*.ipa
             ios/Build/*.xcresult
             ios/Build/Screenshots
+      - name: Preserve compiled dependencies after failed validation
+        if: always() && steps.build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            codex-rs/target
+            ios/Build/Cargo
+          key: ios-${{ runner.os }}-${{ runner.arch }}-rust195-${{ hashFiles('codex-rs/Cargo.lock') }}
       - name: Build summary
         if: always()
         run: |

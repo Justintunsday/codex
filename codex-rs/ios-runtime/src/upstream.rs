@@ -212,7 +212,6 @@ pub(crate) async fn run_turn(
     let mut options = StartThreadOptions::new(config);
     options.allow_provider_model_fallback = true;
     options.environments = Some(Vec::new());
-    options.reserved_thread_id = Some(ThreadId::from_string(&session.id)?);
     if let Some(relative) = &session.core_rollout {
         let path = PathBuf::from(relative);
         if path
@@ -226,6 +225,8 @@ pub(crate) async fn run_turn(
             bail!("core rollout is outside its container or exceeds the 16 MiB restore limit");
         }
         options.initial_history = RolloutRecorder::get_rollout_history(&path).await?;
+    } else {
+        options.reserved_thread_id = Some(ThreadId::from_string(&session.id)?);
     }
     if project.is_some() {
         options.dynamic_tools = agent::tools()

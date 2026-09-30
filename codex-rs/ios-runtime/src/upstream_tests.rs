@@ -234,7 +234,19 @@ async fn cancelling_core_at_file_review_preserves_rollout_and_never_writes() -> 
     let requests = server.received_requests().await.context("requests")?;
     assert_eq!(requests.len(), 1);
     let body: Value = serde_json::from_slice(&requests[0].body)?;
-    let tools = body["tools"].to_string();
+    // Responses Lite carries tool definitions in a developer input item.
+    let tools = body
+        .get("tools")
+        .cloned()
+        .or_else(|| {
+            body["input"]
+                .as_array()?
+                .iter()
+                .find(|item| item["type"] == "additional_tools")
+                .map(|item| item["tools"].clone())
+        })
+        .context("provider tool definitions")?
+        .to_string();
     assert!(tools.contains("propose_change"));
     assert!(!tools.contains("apply_patch") && !tools.contains("exec_command"));
     assert!(!root.path().join("Core/auth.json").exists());
