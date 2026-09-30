@@ -8,6 +8,9 @@ use anyhow::Context;
 use anyhow::bail;
 use codex_ios_platform::Change;
 use codex_ios_platform::FileSystemBackend;
+use codex_ios_platform::GitCommit;
+use codex_ios_platform::GitLayer;
+use codex_ios_platform::NativeGit;
 use codex_ios_platform::PlatformCapabilities;
 use codex_ios_platform::ScopedFiles;
 use serde::Deserialize;
@@ -65,6 +68,19 @@ pub enum Command {
     PreviewChange {
         path: String,
         after: String,
+    },
+    GitInit,
+    GitStatus,
+    GitDiff {
+        path: String,
+        layer: GitLayer,
+    },
+    GitStage {
+        path: String,
+        expected_current: String,
+    },
+    GitCommit {
+        request: GitCommit,
     },
     Review {
         id: String,
@@ -154,6 +170,8 @@ pub async fn run(
                     match command {
                         Command::CreateSession | Command::RestoreSession { .. } | Command::OpenProject { .. }
                             if turn.is_some() => bail!("cancel the active task before changing sessions or projects"),
+                        Command::GitInit | Command::GitStatus | Command::GitDiff { .. } | Command::GitStage { .. } | Command::GitCommit { .. }
+                            if turn.is_some() => bail!("cancel the active task before Git operations"),
                         Command::CreateSession => {
                             let created = Session::new();
                             store.save(&created)?;
@@ -184,6 +202,31 @@ pub async fn run(
                             let files = project.as_ref().context("select a project first")?.clone();
                             let change = files.prepare(&path, after)?;
                             agent::request_review(change, files, &reviews, &events, /*answer*/ None).await?;
+                        }
+                        Command::GitInit => {
+                            let project = project.as_ref().context("select a project first")?.clone();
+                            tokio::task::spawn_blocking(move || NativeGit::initialize(&project)).await??;
+                            events.send(json!({"type":"gitUpdated", "message":"Repository initialized in imported project"})).await?;
+                        }
+                        Command::GitStatus => {
+                            let project = project.as_ref().context("select a project first")?.clone();
+                            let report = tokio::task::spawn_blocking(move || NativeGit::open(&project)?.status()).await??;
+                            events.send(json!({"type":"gitStatus", "git":report})).await?;
+                        }
+                        Command::GitDiff { path, layer } => {
+                            let project = project.as_ref().context("select a project first")?.clone();
+                            let diff = tokio::task::spawn_blocking(move || NativeGit::open(&project)?.diff(&path, layer)).await??;
+                            events.send(json!({"type":"gitDiff", "gitDiff":diff})).await?;
+                        }
+                        Command::GitStage { path, expected_current } => {
+                            let project = project.as_ref().context("select a project first")?.clone();
+                            tokio::task::spawn_blocking(move || NativeGit::open(&project)?.stage(&path, &expected_current)).await??;
+                            events.send(json!({"type":"gitUpdated", "message":"Reviewed file staged"})).await?;
+                        }
+                        Command::GitCommit { request } => {
+                            let project = project.as_ref().context("select a project first")?.clone();
+                            let id = tokio::task::spawn_blocking(move || NativeGit::open(&project)?.commit(request)).await??;
+                            events.send(json!({"type":"gitUpdated", "message":format!("Created commit {id}")})).await?;
                         }
                         Command::Review { id, decision } => {
                             let review = reviews.lock().map_err(|_| anyhow::anyhow!("review state poisoned"))?.remove(&id).context("review is no longer active")?;

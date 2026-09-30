@@ -113,3 +113,81 @@ fn interrupted_tool_recovery_appends_a_result_and_retains_existing_context() -> 
     assert_eq!(store.load(&session.id)?.items, recovered.items);
     Ok(())
 }
+
+#[tokio::test]
+async fn json_git_commands_commit_reviewed_index_and_preserve_working_changes() -> anyhow::Result<()>
+{
+    let home = tempfile::tempdir()?;
+    let project = tempfile::tempdir()?;
+    std::fs::write(project.path().join("hello.txt"), "Reviewed\n")?;
+    let (commands, receive) = mpsc::channel(/*buffer*/ 8);
+    let (events, mut output) = mpsc::channel(/*buffer*/ 16);
+    let runtime = tokio::spawn(run(
+        Init {
+            home: home.path().to_owned(),
+        },
+        receive,
+        events,
+    ));
+    output.recv().await.context("ready")?;
+    commands
+        .send(serde_json::from_value(
+            json!({"type":"openProject", "path":project.path()}),
+        )?)
+        .await?;
+    output.recv().await.context("project")?;
+    commands
+        .send(serde_json::from_value(json!({"type":"gitInit"}))?)
+        .await?;
+    output.recv().await.context("initialized")?;
+    commands
+        .send(serde_json::from_value(json!({"type":"gitStatus"}))?)
+        .await?;
+    let report = output.recv().await.context("initial status")?;
+    assert_eq!(
+        report["git"]["changes"],
+        json!([{"path":"hello.txt", "index":"", "working":"?"}])
+    );
+    commands
+        .send(serde_json::from_value(
+            json!({"type":"gitDiff", "path":"hello.txt", "layer":"working"}),
+        )?)
+        .await?;
+    let diff = output.recv().await.context("diff")?;
+    commands.send(serde_json::from_value(json!({"type":"gitStage", "path":"hello.txt", "expectedCurrent":diff["gitDiff"]["currentId"]}))?).await?;
+    output.recv().await.context("staged")?;
+    commands
+        .send(serde_json::from_value(json!({"type":"gitStatus"}))?)
+        .await?;
+    let report = output.recv().await.context("staged status")?;
+    assert_eq!(
+        report["git"]["changes"],
+        json!([{"path":"hello.txt", "index":"A", "working":""}])
+    );
+    std::fs::write(project.path().join("hello.txt"), "Unstaged\n")?;
+    commands
+        .send(serde_json::from_value(
+            json!({"type":"gitCommit", "request":{
+                "expectedHead":report["git"]["headId"], "expectedIndex":report["git"]["indexId"],
+                "name":"Native Tester", "email":"native@example.com", "message":"Reviewed commit"
+            }}),
+        )?)
+        .await?;
+    let committed = output.recv().await.context("committed")?;
+    assert_eq!(committed["type"], "gitUpdated");
+    commands
+        .send(serde_json::from_value(json!({"type":"gitStatus"}))?)
+        .await?;
+    let status = output.recv().await.context("final status")?;
+    assert_eq!(
+        status["git"]["changes"],
+        json!([{"path":"hello.txt", "index":"", "working":"M"}])
+    );
+    assert_eq!(
+        std::fs::read_to_string(project.path().join("hello.txt"))?,
+        "Unstaged\n"
+    );
+    commands.send(Command::Shutdown).await?;
+    runtime.await??;
+    Ok(())
+}

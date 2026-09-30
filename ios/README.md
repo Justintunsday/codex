@@ -4,11 +4,13 @@ This directory contains a real SwiftUI iPhone/iPad app and a Rust static-library
 
 The default engine embeds the unchanged upstream `codex-core`: ThreadManager, configuration loading, model communication, agent orchestration and its native rollout/session format. iOS owns the runtime lifecycle and exposes scoped file tools through Core's dynamic-tool protocol. Desktop executor environments are not selected in the app sandbox. Code-mode requires a separate process host and is reported as unavailable. Earlier mobile Responses sessions retain their original engine and history; changing engines requires a new session.
 
-**This is still an incomplete platform port.** The unchanged full core passed the actual `aarch64-apple-ios` check in [run 36747720140](https://github.com/Justintunsday/codex/actions/runs/36747720140). The embedded integration additionally requires its own tests and an app archive to pass; a successful `cargo check` alone does not validate device execution. Native Git, terminal backends, account OAuth and the optional enhanced adapter remain outstanding.
+**This is still an incomplete platform port.** The unchanged full core passed the actual `aarch64-apple-ios` check in [run 36747720140](https://github.com/Justintunsday/codex/actions/runs/36747720140). The embedded integration additionally requires its own tests and an app archive to pass; a successful `cargo check` alone does not validate device execution. Terminal backends, account OAuth and the optional enhanced adapter remain outstanding.
 
 ## Current implementation
 
 SwiftUI conversation and streamed output, reasoning summaries, tool activity, native file browser/editor, reviewed unified diffs, before/after comparison, API model discovery, Keychain API credentials, project import/share, persisted session history, and compatibility diagnostics. iPhone uses tabs; iPad uses a sidebar.
+
+Native Git uses the existing workspace's Rust Git library without a subprocess. Initialize a repository or import its `.git` directory, compare HEAD/index/working files, review and stage individual text files, then confirm a commit with an explicit author and message. Staging refuses content changed after review; commits verify the reviewed HEAD/index and preserve unstaged work. Commits are unsigned and do not run hooks. Analysis is capped at 10,000 entries and 500 changed files; text diffs use the editor's 64 KiB limit. Network operations, merge resolution, submodules, symlinks, linked worktrees, alternate object stores and attribute/EOL filters require another backend. No Git credentials are requested or stored.
 
 Projects are explicitly imported as app-owned copies through Document Picker and NSFileCoordinator. Rust never writes directly into an external file provider. Export edited files using Share. Imports reject symlinks and enforce a 10,000-file / 256 MiB limit. The editor supports UTF-8 files up to 64 KiB. File previews preserve a baseline and saving refuses stale changes. All paths are relative to the authorized project; symlinks and parent traversal are refused. Concurrent external mutation of the imported project is not supported.
 
@@ -16,11 +18,11 @@ The C ABI has six functions: version, initialize, command, poll event, free stri
 
 Background and memory-pressure events cancel work and request upstream thread shutdown. The app does not claim unlimited iOS background execution. Every text delta is checkpointed before delivery; Core rollouts are flushed at tool/turn boundaries. Cold resume uses Core's rollout loader and retains its history recovery behavior. Pending native writes never replay without approval. Display history is capped at 256 KiB, individual prompts at 8 KiB and assistant messages at 32 KiB. Core rollout restores are capped at 16 MiB; Core owns model context management. Native dynamic tools are capped at 12 calls per turn, 8 KiB arguments and 1,800-character results. Legacy Responses sessions keep their 32 KiB context / 12-response-round limits. Tool content can exceed 1,000 tokens and requires manual model-context review before merging.
 
-Secrets are stored with Keychain `WhenUnlockedThisDeviceOnly`; the bridge supplies Core's ephemeral in-memory credential store. No API key is persisted in Documents, preferences, Rust sessions, or diagnostics. Requests require HTTPS. ATS remains enabled; certificate verification and upstream TLS behavior remain intact. HTTP/2/SSE use the upstream transport. The mobile provider selects HTTP streaming; WebSockets have not been validated on devices.
+Secrets are stored with Keychain `WhenUnlockedThisDeviceOnly`; the bridge supplies Core's ephemeral in-memory credential store. No API key is persisted in Documents, preferences, Rust sessions, or diagnostics. Requests require HTTPS. Core's application network policy also restricts model traffic and redirects to the configured provider host. ATS remains enabled; certificate verification and upstream TLS behavior remain intact. HTTP/2/SSE use the upstream transport. The mobile provider selects HTTP streaming; WebSockets have not been validated on devices.
 
 ## Not implemented yet
 
-- Remote process/tool adapter, terminal emulator/PTY, native Git status/diff/commit.
+- Remote process/tool adapter and terminal emulator/PTY.
 - ChatGPT OAuth/account sign-in, refresh and account migration.
 - Optional enhanced runtime: the capability boundary reports `adapterNotInstalled`; there is no privilege escalation or jailbreak implementation.
 - In-place editing of external provider projects, project archive import/export, session deletion/export and resumable network tasks after background termination.
@@ -30,7 +32,7 @@ The UI labels unsupported backends explicitly. It never assumes a shell, git, co
 
 ## Agent behavior validation
 
-The targeted Rust tests cover upstream streaming and completed-item responses, cold resume with prior model context, ephemeral credentials, a dynamic file-tool review followed by cancellation, rollout readability after interruption, and the absence of desktop executor tools. Existing actor tests cover approval-before-write and persisted sessions; file review has an `insta` event snapshot. Native UI tests cover file approval, saved content after app restart, and termination during an unapproved review, as well as phone/tablet navigation, rotation and large text. Live API/device networking and all four supported OS generations still require device validation.
+The targeted Rust tests cover upstream streaming and completed-item responses, cold resume with prior model context, ephemeral credentials, a dynamic file-tool review followed by cancellation, rollout readability after interruption, and the absence of desktop executor tools. Actor tests cover approval-before-write, persisted sessions and the Git command bridge. Git tests separate staged/working/ignored files, preserve unstaged work during commits, initialize nested projects, and reject stale reviews and unsupported filters. File review and Git diffs have `insta` snapshots. Native UI tests cover file approval, saved content after app restart, termination during an unapproved review, and Git initialization/diff/staging/commit/restart, as well as phone/tablet navigation, rotation and large text. Live API/device networking and all four supported OS generations still require device validation.
 
 ## GitHub build and installation
 
@@ -46,4 +48,4 @@ Rust's target requirements and deployment environment are documented in the [Rus
 
 ## Reviewable landing stages
 
-The complete application is larger than the repository's 800-line review guidance. The smallest coherent stage is the confined platform crate and its tests; subsequent stages are persistence/FFI, native views/build automation, then embedded Core integration. Follow-up commits separate the agent integration from native lifecycle/UI tests. Split the initial scaffold into these reviewable stages before upstream review. Existing CLI APIs and rollouts are unchanged, and existing desktop core modules are not modified.
+The complete application is larger than the repository's 800-line review guidance. The smallest coherent stage is the confined platform crate and its tests; subsequent stages are persistence/FFI, native views/build automation, then embedded Core integration. Follow-up commits separate the agent integration from native lifecycle/UI tests. Git follows three stages: confined status/diff with read tests, staged writes/commits with mutation tests, then the JSON bridge/native views and UI tests. Split the initial scaffold into these reviewable stages before upstream review. Existing CLI APIs and rollouts are unchanged, and existing desktop core modules are not modified.

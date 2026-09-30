@@ -74,6 +74,8 @@ struct RuntimeEvent: Decodable {
     var capabilities: Capabilities?
     var arch: String?
     var os: String?
+    var git: GitReport?
+    var gitDiff: GitFileDiff?
 }
 
 struct ActivityEntry: Identifiable {
@@ -81,4 +83,25 @@ struct ActivityEntry: Identifiable {
     var date = Date()
     var category: String
     var text: String
+}
+
+struct GitChange: Decodable, Identifiable {
+    var path: String
+    var index: String
+    var working: String
+    var id: String { path }
+}
+
+struct GitReport: Decodable {
+    var head: String
+    var headId: String
+    var indexId: String
+    var changes: [GitChange]
+}
+
+struct GitFileDiff: Decodable {
+    var path: String
+    var diff: String
+    var currentId: String
+    var layer: String
 }

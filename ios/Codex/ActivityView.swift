@@ -14,15 +14,17 @@ struct ActivityView: View {
                         Text(entry.text).font(.system(.subheadline, design: .monospaced)).textSelection(.enabled)
                     }.padding(.vertical, 8)
                 }
+            } else if tab == 2 {
+                GitView()
             } else {
                 Form {
-                    Section(tab == 1 ? "Terminal / PTY" : "Git") {
+                    Section("Terminal / PTY") {
                         Label("Backend unavailable", systemImage: "info.circle")
-                        Text(tab == 1 ? "The installed runtime cannot launch a shell or PTY in the iOS app sandbox. A remote execution adapter is required." : "Git status, diff and commit require a native Git or remote adapter. File review is available in Files.")
+                        Text("The installed runtime cannot launch a shell or PTY in the iOS app sandbox. A remote execution adapter is required.")
                             .foregroundStyle(.secondary)
                     }
                     Section("Runtime capability") {
-                        Text(tab == 1 ? (store.capabilities?.process ?? "Detecting…") : (store.capabilities?.gitCommit ?? "Detecting…"))
+                        Text(store.capabilities?.process ?? "Detecting…")
                             .font(Design.code)
                     }
                 }

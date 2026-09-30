@@ -76,6 +76,54 @@ final class WorkspaceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["fileContents"].waitForExistence(timeout: 5))
     }
 
+    func testNativeGitInitDiffStageCommitAndRestart() {
+        let app = XCUIApplication()
+        app.launchEnvironment["CODEX_UI_TEST_PROJECT"] = "1"
+        app.launchEnvironment["CODEX_UI_TEST_GIT"] = "1"
+        app.launchEnvironment["CODEX_UI_TEST_RESET"] = "1"
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
+        let tab = app.tabBars.buttons["Activity"]
+        if tab.exists { tab.tap() } else { app.buttons["Activity"].firstMatch.tap() }
+        app.buttons["Git"].tap()
+        app.buttons["gitInitialize"].tap()
+        let file = app.descendants(matching: .any).matching(identifier: "gitFile_hello.txt").firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 10))
+        file.tap()
+        let diff = app.staticTexts["gitDiffText"]
+        XCTAssertTrue(diff.waitForExistence(timeout: 5))
+        XCTAssertTrue(diff.label.contains("+Hello from the project."))
+        attach("Native Git diff", app: app)
+        app.buttons["gitStageFile"].tap()
+        for (identifier, value) in [("gitAuthorName", "Native Tester"), ("gitAuthorEmail", "native@example.com"), ("gitCommitMessage", "Initial native commit")] {
+            let field = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+            XCTAssertTrue(field.waitForExistence(timeout: 5))
+            if !field.isHittable { app.swipeUp() }
+            field.tap()
+            field.typeText(value)
+            let done = app.toolbars.buttons["Done"]
+            if done.exists { done.tap() }
+        }
+        app.swipeUp()
+        let review = app.buttons["gitReviewCommit"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+        review.tap()
+        XCTAssertTrue(app.buttons["Create commit"].waitForExistence(timeout: 5))
+        attach("Review staged Git commit", app: app)
+        app.buttons["Create commit"].tap()
+        XCTAssertTrue(app.staticTexts["Working tree is clean"].waitForExistence(timeout: 10))
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "CODEX_UI_TEST_RESET")
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
+        let reopenedTab = app.tabBars.buttons["Activity"]
+        if reopenedTab.exists { reopenedTab.tap() } else { app.buttons["Activity"].firstMatch.tap() }
+        app.buttons["Git"].tap()
+        app.buttons["Refresh Git status"].tap()
+        XCTAssertTrue(app.staticTexts["Working tree is clean"].waitForExistence(timeout: 10))
+        attach("Native Git survives restart", app: app)
+    }
+
     private func attach(_ name: String, app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

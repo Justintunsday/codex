@@ -22,6 +22,8 @@ final class WorkspaceStore: ObservableObject {
     @Published var engine = "codexCore"
     @Published var models: [String] = []
     @Published var loadingModels = false
+    @Published var git: GitReport?
+    @Published var gitDiff: GitFileDiff?
     private var bridge: RustBridge?
     private let support: URL
     private let preferences: UserDefaults
@@ -145,6 +147,8 @@ final class WorkspaceStore: ObservableObject {
     func selectProject(_ selected: Project) {
         guard !working else { error = "Cancel the task before changing projects."; return }
         project = selected
+        git = nil
+        gitDiff = nil
         preferences.set(selected.id.uuidString, forKey: "projectID")
         folder = ""
         file = nil
@@ -195,6 +199,12 @@ final class WorkspaceStore: ObservableObject {
             if let file { command("readFile", ["path": file.path]) }
             browse(folder)
         case "tool": log("tool", "\(event.name ?? "Tool") · \(event.status ?? "")")
+        case "gitStatus": git = event.git
+        case "gitDiff": gitDiff = event.gitDiff
+        case "gitUpdated":
+            log("git", event.message ?? "Git updated")
+            gitDiff = nil
+            command("gitStatus")
         case "coreEvent": log("agent", event.name ?? "Event")
         case "error": error = event.message; log("error", event.message ?? "Unknown runtime error")
         case "diagnostics": capabilities = event.capabilities
