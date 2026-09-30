@@ -245,10 +245,22 @@ async fn cancelling_core_at_file_review_preserves_rollout_and_never_writes() -> 
                 .find(|item| item["type"] == "additional_tools")
                 .map(|item| item["tools"].clone())
         })
-        .context("provider tool definitions")?
-        .to_string();
-    assert!(tools.contains("propose_change"));
-    assert!(!tools.contains("apply_patch") && !tools.contains("exec_command"));
+        .context("provider tool definitions")?;
+    let names: Vec<_> = tools
+        .as_array()
+        .context("tool array")?
+        .iter()
+        .flat_map(|tool| match tool["tools"].as_array() {
+            Some(namespace) => namespace.iter().collect::<Vec<_>>(),
+            None => vec![tool],
+        })
+        .filter_map(|tool| tool["name"].as_str())
+        .collect();
+    assert!(names.contains(&"propose_change"), "tools: {names:?}");
+    assert!(
+        !names.contains(&"apply_patch") && !names.contains(&"exec_command"),
+        "tools: {names:?}"
+    );
     assert!(!root.path().join("Core/auth.json").exists());
     Ok(())
 }

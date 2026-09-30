@@ -23,6 +23,8 @@ use codex_extension_api::LoadedUserInstructions;
 use codex_extension_api::UserInstructionsProvider;
 use codex_extension_api::empty_extension_registry;
 use codex_features::Feature;
+use codex_http_client::DestinationPolicy;
+use codex_http_client::NetworkPolicyController;
 use codex_ios_platform::ScopedFiles;
 use codex_login::AuthCredentialsStoreMode;
 use codex_login::AuthKeyringBackendKind;
@@ -176,6 +178,34 @@ pub(crate) async fn run_turn(
         config.model_provider_id.clone(),
         config.model_provider.clone(),
     );
+    // Rust transport enforces HTTPS independently of the native ATS settings,
+    // including redirects. Model traffic stays on the configured provider host.
+    let endpoint = url::Url::parse(
+        config
+            .model_provider
+            .base_url
+            .as_deref()
+            .context("provider URL")?,
+    )?;
+    let network = NetworkPolicyController::default();
+    let policy = DestinationPolicy::Restricted {
+        allowed_hosts: [endpoint
+            .host_str()
+            .context("provider host")?
+            .trim_end_matches('.')
+            .to_owned()]
+        .into(),
+    };
+    #[cfg(test)]
+    let policy = if endpoint.scheme() == "http" && endpoint.host_str() == Some("127.0.0.1") {
+        DestinationPolicy::Unrestricted
+    } else {
+        policy
+    };
+    if !network.publish(network.policy().revision(), policy) {
+        bail!("provider network policy changed during startup");
+    }
+    config.application_network_policy = network.policy();
     let auth = Arc::new(
         AuthManager::new(
             home.clone(),
