@@ -1,0 +1,10 @@
+---
+source: ios-platform/src/git_tests.rs
+assertion_line: 40
+expression: visible.diff
+---
+--- a/hello.txt
++++ b/hello.txt
+@@ -1 +1 @@
+-Staged
++Working

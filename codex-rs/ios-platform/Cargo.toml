@@ -8,10 +8,13 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
+gix = { workspace = true, features = ["index", "excludes"] }
 serde = { workspace = true, features = ["derive"] }
 similar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
 pretty_assertions = { workspace = true }

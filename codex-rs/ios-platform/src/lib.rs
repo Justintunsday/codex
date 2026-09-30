@@ -1,9 +1,15 @@
 //! Container-scoped iOS tools. No desktop executable or elevated privilege is assumed.
 mod files;
+mod git;
 
 pub use files::Change;
 pub use files::FileEntry;
 pub use files::ScopedFiles;
+pub use git::GitChange;
+pub use git::GitDiff;
+pub use git::GitLayer;
+pub use git::GitReport;
+pub use git::NativeGit;
 
 use serde::Serialize;
 

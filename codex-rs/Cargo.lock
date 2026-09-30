@@ -3756,6 +3756,9 @@ dependencies = [
 name = "codex-ios-platform"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
+ "gix",
+ "insta",
  "pretty_assertions",
  "serde",
  "similar",
@@ -7521,6 +7524,7 @@ dependencies = [
  "gix-glob",
  "gix-hash",
  "gix-hashtable",
+ "gix-ignore",
  "gix-index",
  "gix-lock",
  "gix-merge",

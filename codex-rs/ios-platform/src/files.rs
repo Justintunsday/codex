@@ -28,7 +28,7 @@ pub struct Change {
 }
 
 pub struct ScopedFiles {
-    root: PathBuf,
+    pub(crate) root: PathBuf,
 }
 
 impl ScopedFiles {
@@ -40,7 +40,7 @@ impl ScopedFiles {
         Ok(Self { root })
     }
 
-    fn resolve(&self, relative: &str) -> Result<PathBuf, PlatformError> {
+    pub(crate) fn resolve(&self, relative: &str) -> Result<PathBuf, PlatformError> {
         let relative = Path::new(relative);
         if relative
             .components()
