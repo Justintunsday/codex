@@ -1,0 +1,126 @@
+name: Native iOS
+
+on:
+  push:
+    branches: ["codex/ios-native"]
+    paths: ["ios/**", "codex-rs/ios-*/**", "codex-rs/Cargo.toml", "codex-rs/Cargo.lock", ".github/workflows/ios-native.yml"]
+  pull_request:
+    paths: ["ios/**", "codex-rs/ios-*/**", "codex-rs/Cargo.toml", "codex-rs/Cargo.lock", ".github/workflows/ios-native.yml"]
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: Export a signed IPA using repository signing secrets
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-app:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          brew install xcodegen just
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt,clippy
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim --toolchain 1.95.0
+          cargo +1.95.0 install --locked cargo-nextest
+      - name: Test mobile crates
+        run: just test -p codex-ios-platform -p codex-ios-runtime -p codex-ios-ffi
+      - name: Build arm64 device app
+        run: bash ios/Scripts/build-app.sh
+      - name: Verify deployment metadata
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          with open('ios/Build/Codex.xcarchive/Products/Applications/Codex.app/Info.plist', 'rb') as source:
+              info = plistlib.load(source)
+          assert info['MinimumOSVersion'] == '16.0', info
+          assert info['UIDeviceFamily'] == [1, 2], info
+          assert not info.get('NSAppTransportSecurity', {}).get('NSAllowsArbitraryLoads', False)
+          PY
+          xcrun vtool -show-build ios/Build/Codex.xcarchive/Products/Applications/Codex.app/Codex
+      - name: Select a simulator
+        id: simulator
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
+          for family in ('iPhone', 'iPad'):
+              matches = [(runtime, device) for runtime, group in devices.items() if '.iOS-' in runtime for device in group if family in device['name'] and device.get('isAvailable')]
+              if not matches:
+                  raise SystemExit(f'No {family} simulator available')
+              runtime, device = sorted(matches, key=lambda match: match[0], reverse=True)[0]
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                  output.write(f'{family.lower()}={device["udid"]}\n')
+          PY
+      - name: iPhone and iPad UI smoke tests
+        run: |
+          for destination in '${{ steps.simulator.outputs.iphone }}' '${{ steps.simulator.outputs.ipad }}'; do
+            xcodebuild -project ios/Codex.xcodeproj -scheme Codex -destination "id=$destination" \
+              -resultBundlePath "ios/Build/UI-$destination.xcresult" CODE_SIGNING_ALLOWED=NO test
+          done
+      - name: Signed export
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD }}
+        run: bash ios/Scripts/sign-app.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Codex-iOS
+          if-no-files-found: warn
+          path: |
+            ios/Build/Codex-unsigned.app.zip
+            ios/Build/Codex-unsigned.ipa
+            ios/Build/Signed/*.ipa
+            ios/Build/*.xcresult
+      - name: Build summary
+        if: always()
+        run: |
+          printf '%s\n' 'Native SwiftUI app uses the mobile Responses adapter. Full Codex core migration remains incomplete.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Unsigned artifacts require signing before device installation. Device testing on iOS 16/17/18/26 is still required.' >> "$GITHUB_STEP_SUMMARY"
+
+  core-platform-audit:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit source and dependency graph
+        run: |
+          mkdir -p ios/Build/Audit
+          python3 ios/Scripts/audit-platform.py
+          rustup target add aarch64-apple-ios
+          cd codex-rs
+          cargo tree --locked -p codex-core --target aarch64-apple-ios > ../ios/Build/Audit/core-dependencies.txt
+      - name: Check full upstream core for arm64 iOS
+        continue-on-error: true
+        id: core
+        run: |
+          set -o pipefail
+          cd codex-rs
+          export SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
+          export IPHONEOS_DEPLOYMENT_TARGET=16.0
+          cargo check --locked -p codex-core --target aarch64-apple-ios 2>&1 | tee ../ios/Build/Audit/core-check.log
+      - name: Record core check outcome
+        if: always()
+        run: |
+          mkdir -p ios/Build/Audit
+          printf '%s\n' '${{ steps.core.outcome }}' > ios/Build/Audit/core-check-status.txt
+          printf '%s\n' 'Full upstream core iOS check: ${{ steps.core.outcome }}. This audit is separate from the adapter app build.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Codex-iOS-platform-audit
+          path: ios/Build/Audit

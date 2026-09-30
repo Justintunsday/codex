@@ -3742,6 +3742,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "codex-ios-ffi"
+version = "0.0.0"
+dependencies = [
+ "codex-ios-runtime",
+ "pretty_assertions",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "codex-ios-platform"
+version = "0.0.0"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "similar",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "codex-ios-runtime"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "codex-api",
+ "codex-http-client",
+ "codex-ios-platform",
+ "codex-protocol",
+ "futures",
+ "http 1.4.0",
+ "insta",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
 name = "codex-keyring-store"
 version = "0.0.0"
 dependencies = [

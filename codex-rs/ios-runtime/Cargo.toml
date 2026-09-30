@@ -1,0 +1,28 @@
+[package]
+name = "codex-ios-runtime"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+codex-api = { workspace = true }
+codex-http-client = { workspace = true }
+codex-ios-platform = { workspace = true }
+codex-protocol = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+url = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+wiremock = { workspace = true }
+insta = { workspace = true }
