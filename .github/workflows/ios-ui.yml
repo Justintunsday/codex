@@ -39,7 +39,7 @@ jobs:
           xcodebuild -project ios/Codex.xcodeproj -scheme Codex -configuration Debug \
             -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/Build/Simulator \
             -skipPackagePluginValidation CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
-            CODE_SIGN_STYLE=Automatic build-for-testing 2>&1 | tee ios/Build/ui-build.log
+            CODE_SIGN_STYLE=Automatic GENERATE_INFOPLIST_FILE=YES build-for-testing 2>&1 | tee ios/Build/ui-build.log
       - name: Select iPhone and iPad
         id: simulator
         run: |
@@ -64,7 +64,7 @@ jobs:
             xcodebuild -project ios/Codex.xcodeproj -scheme Codex -configuration Debug \
               -destination "id=$destination" -derivedDataPath ios/Build/Simulator \
               -skipPackagePluginValidation -resultBundlePath "ios/Build/UI-$destination.xcresult" \
-              CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic test-without-building
+              CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic GENERATE_INFOPLIST_FILE=YES test-without-building
             xcrun simctl shutdown "$destination"
           done
       - name: Export UI screenshots
