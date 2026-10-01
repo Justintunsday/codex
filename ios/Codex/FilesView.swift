@@ -6,6 +6,7 @@ struct FilesView: View {
     var body: some View {
         List {
             Section {
+                Text("Project files").font(.title2.weight(.semibold))
                 Button { showProjectList = true } label: { Label(store.project?.name ?? "Select an imported project", systemImage: "folder") }.disabled(store.working)
                 if store.importing { ProgressView("Importing project…") }
                 if store.project != nil {
@@ -27,6 +28,7 @@ struct FilesView: View {
                 if store.project == nil { Text("Import a folder with the button above.").foregroundStyle(.secondary) }
             }
         }
+        .scrollContentBackground(.hidden).background(Design.canvas)
         .navigationTitle("Files")
         .refreshable { store.browse(store.folder) }
         .sheet(isPresented: $showProjectList) {

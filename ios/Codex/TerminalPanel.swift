@@ -18,8 +18,9 @@ struct TerminalPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label(store.terminalStatus.capitalized, systemImage: "terminal")
+                    .font(.headline).fixedSize(horizontal: false, vertical: true)
                 Spacer()
-                Button("Connection") { settings = true }.frame(minHeight: 44)
+                Button { settings = true } label: { Label("Terminal connection", systemImage: "gearshape").labelStyle(.iconOnly).frame(width: 44, height: 44) }
             }.padding(.horizontal, 16)
             if !store.terminalMessage.isEmpty { Text(store.terminalMessage).font(.caption).padding(.horizontal, 16) }
             ScrollView([.horizontal, .vertical]) {
@@ -28,12 +29,14 @@ struct TerminalPanel: View {
                     .fixedSize()
             }.accessibilityIdentifier("nativeTerminal")
             HStack(spacing: 16) {
-                Button("Start") { settings = true }.disabled(store.terminalStatus == "running" || store.terminalStatus == "starting")
-                Button("Interrupt") { store.command("terminal", ["request": ["type": "interrupt"]]) }.disabled(store.terminalStatus != "running")
+                Button { settings = true } label: { Label("Start terminal", systemImage: "play.fill").frame(minWidth: 44, minHeight: 44) }
+                    .disabled(store.terminalStatus == "running" || store.terminalStatus == "starting")
+                Button { store.command("terminal", ["request": ["type": "interrupt"]]) } label: { Label("Interrupt", systemImage: "hand.raised").frame(minWidth: 44, minHeight: 44) }
+                    .disabled(store.terminalStatus != "running")
                 Spacer()
-                Button("Stop", role: .destructive) { store.command("terminal", ["request": ["type": "stop"]]) }
+                Button(role: .destructive) { store.command("terminal", ["request": ["type": "stop"]]) } label: { Label("Stop terminal", systemImage: "stop.fill").frame(minWidth: 44, minHeight: 44) }
                     .disabled(store.terminalStatus != "running" && store.terminalStatus != "starting")
-            }.buttonStyle(.bordered).controlSize(.large).padding(.horizontal, 16)
+            }.labelStyle(.iconOnly).buttonStyle(.bordered).padding(.horizontal, 16)
             Text("Remote terminal · 80 × 24 · stops when the app enters background")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
         }.padding(.vertical, 12)
@@ -75,6 +78,7 @@ struct TerminalPanel: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }.scrollDismissesKeyboard(.interactively)
+                .scrollContentBackground(.hidden).background(Design.canvas)
                 .navigationTitle("Terminal connection")
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { settings = false } } }
             }

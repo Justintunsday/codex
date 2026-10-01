@@ -48,6 +48,7 @@ struct GitView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden).background(Design.canvas)
         .scrollDismissesKeyboard(.interactively)
         .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Done") { editing = false } } }
         .confirmationDialog("Commit the staged changes shown above?", isPresented: $confirm, titleVisibility: .visible) {

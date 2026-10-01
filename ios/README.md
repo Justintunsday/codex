@@ -48,17 +48,17 @@ On an authorized executor using this source version, run `codex exec-server --li
 
 The `Native iOS` workflow builds on `macos-26`. It runs targeted Rust tests, builds the arm64 Rust static library, archives the native app, checks the iOS 16 deployment metadata, and runs screenshot-bearing UI smoke tests on an available iPhone and iPad simulator. Only installed simulator runtimes are exercised; this is not a four-version device test matrix.
 
-Download `Codex-iOS` from a successful workflow run. Without signing secrets it contains `Codex-unsigned.app.zip` and `Codex-unsigned.ipa`. These are real compiled app bundles but **cannot be installed directly until signed**. No certificate or provisioning profile is fabricated.
+As soon as the device archive and deployment checks succeed, the workflow uploads `Codex-iOS-IPA` with `Codex-unsigned.ipa` and its `SHA256SUMS`. This download is available before simulator tests finish. The later `Codex-iOS` artifact contains the app bundle, IPA and UI test evidence. These are real compiled app bundles but **cannot be installed directly until signed**. No certificate or provisioning profile is fabricated. Compilation and UI validation are reported separately.
 
 ### Windows sideloading
 
 The requested distribution method is to download the unsigned IPA and sign it locally on Windows. A Mac and repository signing secrets are unnecessary for this route.
 
-1. Open the successful GitHub Actions run, download its `Codex-iOS` artifact and extract `Codex-unsigned.ipa`.
+1. Open the GitHub Actions run, download `Codex-iOS-IPA` after the upload step succeeds and extract `Codex-unsigned.ipa`.
 2. Download the Windows build from [Sideloadly's official website](https://sideloadly.io/). Follow its current Windows prerequisites for Apple's iTunes/iCloud desktop components.
 3. Connect and unlock the iPhone/iPad over USB, approve **Trust This Computer**, and select it in Sideloadly. Drag the IPA into Sideloadly and use your own Apple ID to sign and install it.
 4. If prompted on the device, trust the developer profile under **Settings → General → VPN & Device Management**. Enable **Developer Mode** under **Settings → Privacy & Security** and restart when requested; see [Apple's developer-mode instructions](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device).
-5. Launch Codex, open **Settings**, save the HTTPS API endpoint/key/model, and create a session. Import a project through **Files** when needed.
+5. Launch Codex and import a project through **Files** to browse, edit and review it. Model tasks currently require a funded API account configured in **Settings**. ChatGPT subscription sign-in is pending; a Plus-only account cannot run model tasks in this build.
 
 Sideloadly documents a seven-day signing validity for free Apple IDs and an optional automatic refresh service. Keep the same signing account and bundle identifier when updating to preserve the app's data and Keychain access. Device installation, live API access and all four OS generations still require verification on the user's devices.
 

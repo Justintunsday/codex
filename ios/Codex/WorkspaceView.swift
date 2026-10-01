@@ -47,6 +47,7 @@ struct WorkspaceView: View {
                             }
                         }
                     }
+                    .scrollContentBackground(.hidden).background(Design.canvas)
                     .navigationTitle("Codex")
                 } detail: { NavigationStack { content(page) } }
                 .navigationSplitViewStyle(.balanced)
@@ -72,7 +73,7 @@ struct WorkspaceView: View {
     private func content(_ page: WorkspacePage) -> some View {
         Group {
             switch page {
-            case .task: ConversationView()
+            case .task: ConversationView(openSettings: { self.page = .settings })
             case .files: FilesView()
             case .activity: ActivityView()
             case .settings: SettingsView()

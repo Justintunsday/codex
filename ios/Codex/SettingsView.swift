@@ -7,7 +7,12 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Model connection") {
+            Section("ChatGPT account") {
+                Label("Subscription sign-in is being added", systemImage: "person.crop.circle")
+                Text("This build cannot use your ChatGPT Plus subscription yet.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Section("API connection") {
                 TextField("HTTPS API base URL", text: $store.endpoint)
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 SecureField("API key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -22,7 +27,7 @@ struct SettingsView: View {
                 Button { store.fetchModels() } label: {
                     HStack { Text("Refresh model list"); if store.loadingModels { ProgressView() } }
                 }.disabled(store.loadingModels)
-                Text("Credentials are stored in Keychain. This build supports API key authentication; ChatGPT account sign-in is pending.")
+                Text("API credentials are stored in Keychain. API usage has separate billing from a ChatGPT subscription.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Runtime") {
@@ -61,6 +66,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden).background(Design.canvas)
         .navigationTitle("Settings")
         .onAppear {
             do { key = try Keychain.load(); keyLoaded = true }

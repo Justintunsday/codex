@@ -17,7 +17,11 @@ enum CompatibilityLayer {
 enum Design {
     static let accent = Color("AccentColor")
     static let canvas = Color("Canvas")
+    static let surface = Color("Surface")
+    static let divider = Color.primary.opacity(0.10)
     static let display = Font.system(.largeTitle, design: .serif).weight(.semibold)
     static let code = Font.system(.body, design: .monospaced)
     static let gap: CGFloat = 16
+    static let sectionGap: CGFloat = 24
+    static let corner: CGFloat = 16
 }

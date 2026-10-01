@@ -6,10 +6,14 @@ final class WorkspaceUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
         attach("Conversation", app: app)
+        let connection = app.buttons["modelConnection"]
+        XCTAssertTrue(connection.waitForExistence(timeout: 5))
+        connection.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        openPage("Task", app: app)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 5))
         for page in ["Files", "Activity", "Settings"] {
-            let tab = app.tabBars.buttons[page]
-            if tab.exists { tab.tap() } else { app.buttons[page].firstMatch.tap() }
-            XCTAssertTrue(app.navigationBars[page].waitForExistence(timeout: 5))
+            openPage(page, app: app)
             attach(page, app: app)
         }
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -33,9 +37,10 @@ final class WorkspaceUITests: XCTestCase {
         app.launchEnvironment["CODEX_UI_TEST_TERMINAL"] = "1"
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
-        let tab = app.tabBars.buttons["Activity"]
-        if tab.exists { tab.tap() } else { app.buttons["Activity"].firstMatch.tap() }
-        app.buttons["Terminal"].tap()
+        openPage("Activity", app: app)
+        let terminal = app.segmentedControls["activitySelection"].buttons["Terminal"]
+        XCTAssertTrue(terminal.waitForExistence(timeout: 5))
+        terminal.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "nativeTerminal").firstMatch.waitForExistence(timeout: 5))
         attach("Native ANSI and Unicode terminal", app: app)
     }
@@ -85,8 +90,7 @@ final class WorkspaceUITests: XCTestCase {
 
     private func openFixtureFile(_ app: XCUIApplication) {
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
-        let tab = app.tabBars.buttons["Files"]
-        if tab.exists { tab.tap() } else { app.buttons["Files"].firstMatch.tap() }
+        openPage("Files", app: app)
         let file = app.staticTexts["hello.txt"].firstMatch
         XCTAssertTrue(file.waitForExistence(timeout: 10))
         file.tap()
@@ -100,8 +104,7 @@ final class WorkspaceUITests: XCTestCase {
         app.launchEnvironment["CODEX_UI_TEST_RESET"] = "1"
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
-        let tab = app.tabBars.buttons["Activity"]
-        if tab.exists { tab.tap() } else { app.buttons["Activity"].firstMatch.tap() }
+        openPage("Activity", app: app)
         app.buttons["Git"].tap()
         app.buttons["gitInitialize"].tap()
         let file = app.descendants(matching: .any).matching(identifier: "gitFile_hello.txt").firstMatch
@@ -133,12 +136,19 @@ final class WorkspaceUITests: XCTestCase {
         app.launchEnvironment.removeValue(forKey: "CODEX_UI_TEST_RESET")
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
-        let reopenedTab = app.tabBars.buttons["Activity"]
-        if reopenedTab.exists { reopenedTab.tap() } else { app.buttons["Activity"].firstMatch.tap() }
+        openPage("Activity", app: app)
         app.buttons["Git"].tap()
         app.buttons["Refresh Git status"].tap()
         XCTAssertTrue(app.staticTexts["Working tree is clean"].waitForExistence(timeout: 10))
         attach("Native Git survives restart", app: app)
+    }
+
+    private func openPage(_ page: String, app: XCUIApplication) {
+        let tab = app.tabBars.buttons[page]
+        let button = tab.exists ? tab : app.buttons[page].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.tap()
+        if page != "Task" { XCTAssertTrue(app.navigationBars[page].waitForExistence(timeout: 5)) }
     }
 
     private func attach(_ name: String, app: XCUIApplication) {
