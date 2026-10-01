@@ -76,6 +76,13 @@ struct RuntimeEvent: Decodable {
     var os: String?
     var git: GitReport?
     var gitDiff: GitFileDiff?
+    var sequence: UInt64?
+    var chunk: String?
+}
+
+struct TerminalFrame: Identifiable {
+    var id: UInt64
+    var data: Data
 }
 
 struct ActivityEntry: Identifiable {

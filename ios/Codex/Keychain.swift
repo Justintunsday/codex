@@ -2,16 +2,16 @@ import Foundation
 import Security
 
 enum Keychain {
+    enum Credential: String { case apiKey = "api-key", terminalToken = "terminal-token" }
     private static let service = "org.codex.native-ios"
-    private static let account = "api-key"
-    private static var query: [String: Any] {
+    private static func query(_ credential: Credential) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,
-         kSecAttrAccount as String: account]
+         kSecAttrAccount as String: credential.rawValue]
     }
 
-    static func load() throws -> String {
-        var request = query
+    static func load(_ credential: Credential = .apiKey) throws -> String {
+        var request = query(credential)
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
@@ -22,7 +22,8 @@ enum Keychain {
         return value
     }
 
-    static func save(_ value: String) throws {
+    static func save(_ value: String, credential: Credential = .apiKey) throws {
+        let query = query(credential)
         if value.isEmpty {
             let status = SecItemDelete(query as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else { throw failure(status) }

@@ -26,6 +26,19 @@ final class WorkspaceUITests: XCTestCase {
         attach("Dark conversation with large text", app: app)
     }
 
+    func testNativeTerminalRendersANSIAndUnicode() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launchEnvironment["CODEX_UI_TEST_TERMINAL"] = "1"
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
+        let tab = app.tabBars.buttons["Activity"]
+        if tab.exists { tab.tap() } else { app.buttons["Activity"].firstMatch.tap() }
+        app.buttons["Terminal"].tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "nativeTerminal").firstMatch.waitForExistence(timeout: 5))
+        attach("Native ANSI and Unicode terminal", app: app)
+    }
+
     func testReviewedEditSurvivesRestartAndInterruptedReviewDoesNotWrite() {
         let app = XCUIApplication()
         app.launchEnvironment["CODEX_UI_TEST_PROJECT"] = "1"

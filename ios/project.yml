@@ -14,6 +14,10 @@ settings:
     PRODUCT_BUNDLE_IDENTIFIER: org.codex.native-ios
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: 1.19.0
 targets:
   Codex:
     type: application
@@ -21,6 +25,10 @@ targets:
     sources:
       - Codex
       - Bridge
+      - path: ThirdPartyNotices.txt
+        buildPhase: resources
+    dependencies:
+      - package: SwiftTerm
     settings:
       base:
         PRODUCT_NAME: Codex

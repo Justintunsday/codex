@@ -43,7 +43,7 @@ jobs:
       - name: Test mobile crates
         run: just test -p codex-ios-platform -p codex-ios-runtime -p codex-ios-ffi
       - name: Build arm64 device app
-        run: bash ios/Scripts/build-app.sh
+        run: bash ios/Scripts/build-app.sh 2>&1 | tee ios-build.log
       - name: Verify deployment metadata
         run: |
           python3 - <<'PY'
@@ -73,6 +73,7 @@ jobs:
         run: |
           for destination in '${{ steps.simulator.outputs.iphone }}' '${{ steps.simulator.outputs.ipad }}'; do
             xcodebuild -project ios/Codex.xcodeproj -scheme Codex -destination "id=$destination" \
+              -skipPackagePluginValidation \
               -resultBundlePath "ios/Build/UI-$destination.xcresult" CODE_SIGNING_ALLOWED=NO test
           done
       - name: Signed export
@@ -103,6 +104,8 @@ jobs:
             ios/Build/Signed/*.ipa
             ios/Build/*.xcresult
             ios/Build/Screenshots
+            ios/Codex.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+            ios-build.log
       - name: Preserve compiled dependencies after failed validation
         if: always() && steps.build-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -114,7 +117,7 @@ jobs:
       - name: Build summary
         if: always()
         run: |
-          printf '%s\n' 'Native SwiftUI app embeds upstream codex-core with sandbox-scoped reviewed file tools. Desktop process/PTY backends are unavailable.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Native SwiftUI app embeds upstream codex-core with scoped reviewed file tools. The manual terminal uses a configured WSS exec-server; the app sandbox does not spawn a shell.' >> "$GITHUB_STEP_SUMMARY"
           printf '%s\n' 'Unsigned artifacts require signing before device installation. Device testing on iOS 16/17/18/26 is still required.' >> "$GITHUB_STEP_SUMMARY"
 
   core-platform-audit:

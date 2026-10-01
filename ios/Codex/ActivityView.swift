@@ -17,17 +17,7 @@ struct ActivityView: View {
             } else if tab == 2 {
                 GitView()
             } else {
-                Form {
-                    Section("Terminal / PTY") {
-                        Label("Backend unavailable", systemImage: "info.circle")
-                        Text("The installed runtime cannot launch a shell or PTY in the iOS app sandbox. A remote execution adapter is required.")
-                            .foregroundStyle(.secondary)
-                    }
-                    Section("Runtime capability") {
-                        Text(store.capabilities?.process ?? "Detecting…")
-                            .font(Design.code)
-                    }
-                }
+                TerminalPanel()
             }
         }
         .navigationTitle("Activity")

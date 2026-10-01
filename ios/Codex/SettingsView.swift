@@ -33,15 +33,22 @@ struct SettingsView: View {
                 Text("Create a new session to change agents. Older mobile sessions keep their original history format.").font(.caption).foregroundStyle(.secondary)
                 LabeledContent("Task", value: store.status)
                 LabeledContent("File access", value: "Imported projects")
-                LabeledContent("Shell / PTY", value: store.capabilities?.process ?? "Detecting…")
-                LabeledContent("Enhanced mode", value: "Adapter not installed")
-                Text("Enhanced capabilities are isolated behind an adapter. This build does not acquire elevated access.").font(.caption).foregroundStyle(.secondary)
+                LabeledContent("App shell / PTY", value: store.capabilities?.process ?? "Detecting…")
+                LabeledContent("Execution connection", value: store.terminalStatus)
+                Text("Configure a remote exec-server or a separately installed iOS helper in Activity → Terminal. Helper connectivity does not establish jailbreak status.").font(.caption).foregroundStyle(.secondary)
                 Button("Cancel active task") { store.command("cancel") }.disabled(!store.working)
             }
             Section("Compatibility") {
                 Text(CompatibilityLayer.diagnostic).textSelection(.enabled)
                 Text("Minimum iOS 16.0 · iPhone and iPad · iOS 16 / 17 / 18 / 26")
                 Button("Refresh diagnostics") { store.command("diagnostics") }
+            }
+            Section("Open source") {
+                Link("SwiftTerm terminal emulator · MIT license", destination: URL(string: "https://github.com/migueldeicaza/SwiftTerm")!)
+                if let url = Bundle.main.url(forResource: "ThirdPartyNotices", withExtension: "txt"),
+                   let notices = try? String(contentsOf: url, encoding: .utf8) {
+                    NavigationLink("Third-party notices") { ScrollView { Text(notices).font(.caption).padding(16) }.navigationTitle("Licenses") }
+                }
             }
         }
         .navigationTitle("Settings")

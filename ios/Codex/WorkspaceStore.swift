@@ -24,6 +24,10 @@ final class WorkspaceStore: ObservableObject {
     @Published var loadingModels = false
     @Published var git: GitReport?
     @Published var gitDiff: GitFileDiff?
+    @Published var terminalFrames: [TerminalFrame] = []
+    @Published var terminalGeneration = UUID()
+    @Published var terminalStatus = "idle"
+    @Published var terminalMessage = ""
     private var bridge: RustBridge?
     private let support: URL
     private let preferences: UserDefaults
@@ -63,6 +67,12 @@ final class WorkspaceStore: ObservableObject {
                 }
             }
             bridge = RustBridge(home: support.appendingPathComponent("Sessions")) { [weak self] event in self?.receive(event) }
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["CODEX_UI_TEST_TERMINAL"] == "1" {
+                terminalFrames = [TerminalFrame(id: 1, data: Data("\u{1b}[32mCodex native terminal\u{1b}[0m\r\nUTF-8: 你好 iOS\r\n$ ".utf8))]
+                terminalMessage = "Native ANSI rendering fixture"
+            }
+            #endif
         } catch { self.error = error.localizedDescription }
     }
 
@@ -165,6 +175,7 @@ final class WorkspaceStore: ObservableObject {
 
     func lifecycle(_ state: String) {
         if state != "foreground" { review = nil }
+        if state == "memoryPressure" { terminalFrames = []; terminalGeneration = UUID() }
         command("lifecycle", ["state": state])
     }
 
@@ -205,6 +216,16 @@ final class WorkspaceStore: ObservableObject {
             log("git", event.message ?? "Git updated")
             gitDiff = nil
             command("gitStatus")
+        case "terminalState":
+            terminalStatus = event.status ?? "stopped"
+            terminalMessage = event.message ?? ""
+            if terminalStatus == "starting" { terminalFrames = []; terminalGeneration = UUID() }
+            log("terminal", "\(terminalStatus) \(terminalMessage)")
+        case "terminalOutput":
+            if let sequence = event.sequence, let chunk = event.chunk, let data = Data(base64Encoded: chunk), data.count <= 4096 {
+                terminalFrames.append(TerminalFrame(id: sequence, data: data))
+                if terminalFrames.count > 128 { terminalFrames.removeFirst(terminalFrames.count - 128) }
+            }
         case "coreEvent": log("agent", event.name ?? "Event")
         case "error": error = event.message; log("error", event.message ?? "Unknown runtime error")
         case "diagnostics": capabilities = event.capabilities

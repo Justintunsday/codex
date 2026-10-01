@@ -5,6 +5,7 @@ cd "$task_root/ios"
 command -v xcodegen >/dev/null || { printf 'Install xcodegen with brew install xcodegen\n' >&2; exit 1; }
 xcodegen generate
 xcodebuild -project Codex.xcodeproj -scheme Codex -configuration Release \
+  -skipPackagePluginValidation \
   -destination 'generic/platform=iOS' -archivePath Build/Codex.xcarchive \
   CODE_SIGNING_ALLOWED=NO archive
 ditto -c -k --keepParent Build/Codex.xcarchive/Products/Applications/Codex.app Build/Codex-unsigned.app.zip
