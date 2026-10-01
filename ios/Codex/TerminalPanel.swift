@@ -19,7 +19,7 @@ struct TerminalPanel: View {
             HStack {
                 Label(store.terminalStatus.capitalized, systemImage: "terminal")
                 Spacer()
-                Button("Connection") { settings = true }
+                Button("Connection") { settings = true }.frame(minHeight: 44)
             }.padding(.horizontal, 16)
             if !store.terminalMessage.isEmpty { Text(store.terminalMessage).font(.caption).padding(.horizontal, 16) }
             ScrollView([.horizontal, .vertical]) {
@@ -120,8 +120,7 @@ private struct TerminalCanvas: UIViewRepresentable {
             if frame.id > coordinator.sequence + 1 { view.feed(text: "\r\n[Earlier output omitted]\r\n") }
             view.feed(byteArray: Array(frame.data)[...]); coordinator.sequence = frame.id
         }
-        view.acceptsInput = store.terminalStatus == "running"
-        if !view.acceptsInput { view.resignFirstResponder() }
+        if store.terminalStatus != "running", view.isFirstResponder { view.resignFirstResponder() }
     }
     @MainActor final class Coordinator: NSObject, @preconcurrency TerminalViewDelegate {
         weak var store: WorkspaceStore?
@@ -149,10 +148,10 @@ private struct TerminalCanvas: UIViewRepresentable {
 }
 
 private final class TerminalContainer: UIView {
-    let terminal: InteractiveTerminal
+    let terminal: SwiftTerm.TerminalView
     init() {
         let font = UIFontMetrics(forTextStyle: .body).scaledFont(for: UIFont.monospacedSystemFont(ofSize: 14, weight: .regular))
-        terminal = InteractiveTerminal(frame: .zero, font: font,
+        terminal = SwiftTerm.TerminalView(frame: .zero, font: font,
             options: TerminalOptions(cols: 80, rows: 24, scrollback: 500, enableSixelReported: false, kittyImageCacheLimitBytes: 8 * 1024 * 1024))
         super.init(frame: .zero)
         terminal.nativeBackgroundColor = .systemBackground
@@ -165,9 +164,4 @@ private final class TerminalContainer: UIView {
         super.layoutSubviews()
         terminal.frame = terminal.getOptimalFrameSize()
     }
-}
-
-private final class InteractiveTerminal: SwiftTerm.TerminalView {
-    var acceptsInput = false
-    override var canBecomeFirstResponder: Bool { acceptsInput && super.canBecomeFirstResponder }
 }

@@ -33,7 +33,8 @@ final class RustBridge {
                     codex_string_free(pointer)
                     do {
                         let event = try JSONDecoder().decode(RuntimeEvent.self, from: data)
-                        Task { @MainActor in receive(event) }
+                        // FIFO delivery preserves the order of deltas, states and terminal frames.
+                        DispatchQueue.main.async { receive(event) }
                     } catch {
                         Self.deliverError("Invalid Rust event: \(error.localizedDescription)", receive: receive)
                     }
@@ -62,7 +63,7 @@ final class RustBridge {
 
     private static func deliverError(_ text: String, receive: @escaping @MainActor (RuntimeEvent) -> Void) {
         let event = RuntimeEvent(type: "error", message: text)
-        Task { @MainActor in receive(event) }
+        DispatchQueue.main.async { receive(event) }
     }
 
     deinit {
