@@ -19,6 +19,7 @@ codex-ios-platform = { workspace = true }
 codex-login = { workspace = true }
 codex-model-provider-info = { workspace = true }
 codex-protocol = { workspace = true }
+codex-utils-path-uri = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -32,4 +33,5 @@ uuid = { workspace = true, features = ["v4"] }
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 wiremock = { workspace = true }
+tokio-tungstenite = { workspace = true }
 insta = { workspace = true }

@@ -2,7 +2,9 @@
 //! event bridge. iOS capabilities are selected without changing desktop core.
 mod agent;
 mod session;
+mod terminal;
 mod upstream;
+pub use terminal::TerminalCommand;
 
 use anyhow::Context;
 use anyhow::bail;
@@ -82,6 +84,9 @@ pub enum Command {
     GitCommit {
         request: GitCommit,
     },
+    Terminal {
+        request: TerminalCommand,
+    },
     Review {
         id: String,
         decision: Decision,
@@ -136,6 +141,7 @@ pub async fn run(
     let reviews: Reviews = Arc::new(Mutex::new(HashMap::new()));
     let mut turn: Option<JoinHandle<anyhow::Result<Session>>> = None;
     let mut cancellation = CancellationToken::new();
+    let mut terminal = terminal::TerminalHost::default();
     events
         .send(json!({"type":"ready", "abi":1, "capabilities":PlatformCapabilities::default()}))
         .await?;
@@ -228,6 +234,7 @@ pub async fn run(
                             let id = tokio::task::spawn_blocking(move || NativeGit::open(&project)?.commit(request)).await??;
                             events.send(json!({"type":"gitUpdated", "message":format!("Created commit {id}")})).await?;
                         }
+                        Command::Terminal { request } => terminal.handle(request, &events).await?,
                         Command::Review { id, decision } => {
                             let review = reviews.lock().map_err(|_| anyhow::anyhow!("review state poisoned"))?.remove(&id).context("review is no longer active")?;
                             let result = match decision {
@@ -273,7 +280,12 @@ pub async fn run(
                             turn = Some(tokio::spawn(task));
                             events.send(json!({"type":"status", "status":"working"})).await?;
                         }
-                        Command::Cancel | Command::Lifecycle { state: LifeCycle::Background | LifeCycle::MemoryPressure } => {
+                        command @ (Command::Cancel | Command::Lifecycle { state: LifeCycle::Background | LifeCycle::MemoryPressure }) => {
+                            cancellation.cancel();
+                            if matches!(command, Command::Lifecycle { .. }) {
+                                terminal.stop().await;
+                                events.send(json!({"type":"terminalState", "status":"stopped"})).await?;
+                            }
                             if let Some(active) = turn.take() {
                                 cancellation.cancel();
                                 reviews.lock().map_err(|_| anyhow::anyhow!("review state poisoned"))?.clear();
@@ -318,6 +330,7 @@ pub async fn run(
             let _ = active.await;
         }
     }
+    terminal.stop().await;
     Ok(())
 }
 

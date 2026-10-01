@@ -1,0 +1,9 @@
+---
+source: codex-rs/ios-runtime/src/terminal_tests.rs
+expression: frame
+---
+{
+  "chunk": "G1szMW1IZWxsbxtbMG0NCg==",
+  "sequence": 1,
+  "type": "terminalOutput"
+}
