@@ -1,0 +1,87 @@
+name: Native iOS preview
+
+on:
+  push:
+    branches: ["codex/ios-native"]
+    paths: [".github/workflows/ios-preview.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preview-app:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            codex-rs/target
+            ios/Build/Cargo
+          key: ios-preview-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: ios-${{ runner.os }}-${{ runner.arch }}-rust195-
+      - name: Install build tools
+        run: |
+          brew install xcodegen
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup target add aarch64-apple-ios --toolchain 1.95.0
+      - name: Archive native preview
+        run: |
+          set -o pipefail
+          cd ios
+          xcodegen generate
+          xcodebuild -project Codex.xcodeproj -scheme Codex -configuration Debug \
+            -skipPackagePluginValidation -destination 'generic/platform=iOS' \
+            -archivePath Build/Codex-preview.xcarchive \
+            ENABLE_DEBUG_DYLIB=NO CODE_SIGNING_ALLOWED=NO archive 2>&1 | tee Build/preview-build.log
+      - name: Verify device app and package IPA
+        run: |
+          python3 - <<'PY'
+          import plistlib, struct
+          from pathlib import Path
+          app = Path('ios/Build/Codex-preview.xcarchive/Products/Applications/Codex.app')
+          info_path = app / 'Info.plist'
+          info = plistlib.loads(info_path.read_bytes())
+          assert info['MinimumOSVersion'] == '16.0', info
+          assert info['UIDeviceFamily'] == [1, 2], info
+          assert not info.get('NSAppTransportSecurity', {}).get('NSAllowsArbitraryLoads', False)
+          executable = (app / info['CFBundleExecutable']).read_bytes()
+          magic, cpu, subtype, kind = struct.unpack_from('<4I', executable)
+          assert magic == 0xFEEDFACF and cpu == 0x0100000C and kind == 2
+          assert len(executable) > 1024 * 1024
+          info['CFBundleDisplayName'] = 'Codex Preview'
+          info['CodexBuildChannel'] = 'preview'
+          info_path.write_bytes(plistlib.dumps(info, fmt=plistlib.FMT_BINARY))
+          PY
+          xcrun vtool -show-build ios/Build/Codex-preview.xcarchive/Products/Applications/Codex.app/Codex
+          mkdir -p ios/Build/Preview/Payload
+          ditto ios/Build/Codex-preview.xcarchive/Products/Applications/Codex.app ios/Build/Preview/Payload/Codex.app
+          cd ios/Build/Preview
+          zip -qr Codex-unsigned.ipa Payload
+          shasum -a 256 Codex-unsigned.ipa > SHA256SUMS
+      - name: Upload preview IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Codex-iOS-IPA-preview
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ios/Build/Preview/Codex-unsigned.ipa
+            ios/Build/Preview/SHA256SUMS
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Codex-iOS-preview-build-log
+          if-no-files-found: warn
+          path: ios/Build/preview-build.log
+      - name: Build summary
+        if: always()
+        run: |
+          printf '%s\n' 'Native preview embeds the complete unchanged codex-core. Swift uses Debug; Rust uses the existing dev-small profile. ENABLE_DEBUG_DYLIB=NO produces a standalone device executable. This build requires local signing and does not establish release or device validation.' >> "$GITHUB_STEP_SUMMARY"
