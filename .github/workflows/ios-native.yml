@@ -85,9 +85,14 @@ jobs:
       - name: iPhone and iPad UI smoke tests
         run: |
           for destination in '${{ steps.simulator.outputs.iphone }}' '${{ steps.simulator.outputs.ipad }}'; do
+            xcrun simctl shutdown all
+            xcrun simctl boot "$destination"
+            xcrun simctl bootstatus "$destination" -b
             xcodebuild -project ios/Codex.xcodeproj -scheme Codex -destination "id=$destination" \
               -skipPackagePluginValidation \
-              -resultBundlePath "ios/Build/UI-$destination.xcresult" CODE_SIGNING_ALLOWED=NO test
+              -resultBundlePath "ios/Build/UI-$destination.xcresult" CODE_SIGNING_ALLOWED=YES \
+              CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic GENERATE_INFOPLIST_FILE=YES test
+            xcrun simctl shutdown "$destination"
           done
       - name: Signed export
         if: github.event_name == 'workflow_dispatch' && inputs.sign
