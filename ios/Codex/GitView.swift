@@ -75,11 +75,7 @@ private struct GitDiffView: View {
                 Text("Staged").tag("index")
             }.pickerStyle(.segmented).padding(16)
             if let diff = store.gitDiff, diff.path == file.path, diff.layer == layer {
-                ScrollView([.horizontal, .vertical]) {
-                    Text(diff.diff.isEmpty ? "No text changes" : diff.diff).font(Design.code).textSelection(.enabled)
-                        .accessibilityIdentifier("gitDiffText")
-                        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                }
+                SourceTextView(text: diff.diff.isEmpty ? "No text changes" : diff.diff, identifier: "gitDiffText")
                 if layer == "working" && !file.working.isEmpty {
                     Button("Stage reviewed file") {
                         store.command("gitStage", ["path": file.path, "expectedCurrent": diff.currentId])

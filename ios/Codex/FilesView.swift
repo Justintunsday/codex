@@ -55,7 +55,7 @@ struct FileEditorView: View {
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .accessibilityIdentifier("fileEditor")
                 } else {
-                    ScrollView([.horizontal, .vertical]) { Text(store.file?.text ?? "").font(Design.code).textSelection(.enabled).padding(16).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("fileContents") }
+                    SourceTextView(text: store.file?.text ?? "", identifier: "fileContents")
                 }
             } else { ProgressView("Reading file…") }
         }
@@ -86,15 +86,8 @@ struct ReviewView: View {
                 Picker("Comparison", selection: $comparison) {
                     Text("Diff").tag(0); Text("Before").tag(1); Text("After").tag(2)
                 }.pickerStyle(.segmented).padding(16)
-                ScrollView([.horizontal, .vertical]) {
-                    if comparison == 0 {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(Array(review.change.diff.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                                Text(line.isEmpty ? " " : line).font(Design.code).foregroundStyle(color(line))
-                            }
-                        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    } else { Text(comparison == 1 ? review.change.before : review.change.after).font(Design.code).textSelection(.enabled).padding(16) }
-                }
+                SourceTextView(text: comparison == 0 ? review.change.diff : comparison == 1 ? review.change.before : review.change.after,
+                    style: comparison == 0 ? .diff : .plain, identifier: "reviewDiff")
             }
             .navigationTitle(review.change.path)
             .navigationBarTitleDisplayMode(.inline)
@@ -109,9 +102,4 @@ struct ReviewView: View {
         }
     }
 
-    private func color(_ line: String) -> Color {
-        if line.hasPrefix("+") { return .green }
-        if line.hasPrefix("-") { return .red }
-        return .primary
-    }
 }

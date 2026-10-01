@@ -4,11 +4,11 @@ This directory contains a real SwiftUI iPhone/iPad app and a Rust static-library
 
 The default engine embeds the unchanged upstream `codex-core`: ThreadManager, configuration loading, model communication, agent orchestration and its native rollout/session format. iOS owns the runtime lifecycle and exposes scoped file tools through Core's dynamic-tool protocol. Desktop executor environments are not selected in the app sandbox. Code-mode requires a separate process host and is reported as unavailable. Earlier mobile Responses sessions retain their original engine and history; changing engines requires a new session.
 
-**This is still an incomplete platform port.** The unchanged full core passed the actual `aarch64-apple-ios` check in [run 36747720140](https://github.com/Justintunsday/codex/actions/runs/36747720140). All 18 embedded Core/platform tests, the full-Core arm64 device archive and iOS 16 deployment metadata checks passed in [run 36792696834](https://github.com/Justintunsday/codex/actions/runs/36792696834); its native UI validation is still pending. Subsequent terminal/TLS changes need their own validation. Account OAuth, an installed enhanced helper and four-generation device testing remain outstanding.
+**This is still an incomplete platform port.** The unchanged full core passed the actual `aarch64-apple-ios` check in [run 36747720140](https://github.com/Justintunsday/codex/actions/runs/36747720140). All 18 embedded Core/platform tests, the full-Core arm64 device archive, iOS 16 deployment metadata and four native UI tests on each device family passed in [run 36792696834](https://github.com/Justintunsday/codex/actions/runs/36792696834). Subsequent terminal/TLS and layout changes need their own validation. Account OAuth, an installed enhanced helper and four-generation device testing remain outstanding.
 
 ## Current implementation
 
-SwiftUI conversation and streamed output, reasoning summaries, tool activity, native file browser/editor, reviewed unified diffs, before/after comparison, API model discovery, Keychain API credentials, project import/share, persisted session history, and compatibility diagnostics. iPhone uses tabs; iPad uses a sidebar.
+SwiftUI conversation and streamed output, reasoning summaries, tool activity, native file browser/editor, reviewed unified diffs, before/after comparison, API model discovery, Keychain API credentials, project import/share, persisted session history, and compatibility diagnostics. iPhone uses tabs; iPad uses a sidebar at standard text sizes and a full-width tab layout at accessibility text sizes. Source and diff panes anchor short content at the top-left and scroll long lines without wrapping.
 
 Native Git uses the existing workspace's Rust Git library without a subprocess. Initialize a repository or import its `.git` directory, compare HEAD/index/working files, review and stage individual text files, then confirm a commit with an explicit author and message. Staging refuses content changed after review; commits verify the reviewed HEAD/index and preserve unstaged work. Commits are unsigned and do not run hooks. Analysis is capped at 10,000 entries and 500 changed files; text diffs use the editor's 64 KiB limit. Network operations, merge resolution, submodules, symlinks, linked worktrees, alternate object stores and attribute/EOL filters require another backend. No Git credentials are requested or stored.
 
@@ -49,6 +49,18 @@ On an authorized executor using this source version, run `codex exec-server --li
 The `Native iOS` workflow builds on `macos-26`. It runs targeted Rust tests, builds the arm64 Rust static library, archives the native app, checks the iOS 16 deployment metadata, and runs screenshot-bearing UI smoke tests on an available iPhone and iPad simulator. Only installed simulator runtimes are exercised; this is not a four-version device test matrix.
 
 Download `Codex-iOS` from a successful workflow run. Without signing secrets it contains `Codex-unsigned.app.zip` and `Codex-unsigned.ipa`. These are real compiled app bundles but **cannot be installed directly until signed**. No certificate or provisioning profile is fabricated.
+
+### Windows sideloading
+
+The requested distribution method is to download the unsigned IPA and sign it locally on Windows. A Mac and repository signing secrets are unnecessary for this route.
+
+1. Open the successful GitHub Actions run, download its `Codex-iOS` artifact and extract `Codex-unsigned.ipa`.
+2. Download the Windows build from [Sideloadly's official website](https://sideloadly.io/). Follow its current Windows prerequisites for Apple's iTunes/iCloud desktop components.
+3. Connect and unlock the iPhone/iPad over USB, approve **Trust This Computer**, and select it in Sideloadly. Drag the IPA into Sideloadly and use your own Apple ID to sign and install it.
+4. If prompted on the device, trust the developer profile under **Settings → General → VPN & Device Management**. Enable **Developer Mode** under **Settings → Privacy & Security** and restart when requested; see [Apple's developer-mode instructions](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device).
+5. Launch Codex, open **Settings**, save the HTTPS API endpoint/key/model, and create a session. Import a project through **Files** when needed.
+
+Sideloadly documents a seven-day signing validity for free Apple IDs and an optional automatic refresh service. Keep the same signing account and bundle identifier when updating to preserve the app's data and Keychain access. Device installation, live API access and all four OS generations still require verification on the user's devices.
 
 For signed export, configure repository secrets `IOS_CERTIFICATE_BASE64` (PKCS#12), `IOS_CERTIFICATE_PASSWORD`, `IOS_PROFILE_BASE64`, and `IOS_TEAM_ID`. The provisioning profile must match `org.codex.native-ios` and include the intended devices for development/ad-hoc distribution. Set repository variable `IOS_EXPORT_METHOD` as appropriate for the chosen profile. Run the workflow manually with `sign=true`; the resulting signed IPA is uploaded in the same artifact. Do not commit credentials or put signing secrets in an issue or chat.
 

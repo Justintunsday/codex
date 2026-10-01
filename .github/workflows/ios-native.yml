@@ -32,7 +32,7 @@ jobs:
           path: |
             codex-rs/target
             ios/Build/Cargo
-          key: ios-${{ runner.os }}-${{ runner.arch }}-rust195-${{ hashFiles('codex-rs/Cargo.lock') }}
+          key: ios-${{ runner.os }}-${{ runner.arch }}-rust195-${{ hashFiles('codex-rs/Cargo.lock') }}-${{ hashFiles('codex-rs/ios-*/Cargo.toml', 'codex-rs/ios-*/src/**', 'codex-rs/http-client/Cargo.toml', 'codex-rs/http-client/src/**', 'ios/Scripts/build-rust.sh') }}
           restore-keys: ios-${{ runner.os }}-${{ runner.arch }}-rust195-
       - name: Install build tools
         run: |
@@ -113,7 +113,7 @@ jobs:
           path: |
             codex-rs/target
             ios/Build/Cargo
-          key: ios-${{ runner.os }}-${{ runner.arch }}-rust195-${{ hashFiles('codex-rs/Cargo.lock') }}
+          key: ios-${{ runner.os }}-${{ runner.arch }}-rust195-${{ hashFiles('codex-rs/Cargo.lock') }}-${{ hashFiles('codex-rs/ios-*/Cargo.toml', 'codex-rs/ios-*/src/**', 'codex-rs/http-client/Cargo.toml', 'codex-rs/http-client/src/**', 'ios/Scripts/build-rust.sh') }}
       - name: Build summary
         if: always()
         run: |

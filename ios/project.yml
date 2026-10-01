@@ -27,6 +27,10 @@ targets:
       - Bridge
       - path: ThirdPartyNotices.txt
         buildPhase: resources
+      - path: ../LICENSE
+        buildPhase: resources
+      - path: ../NOTICE
+        buildPhase: resources
     dependencies:
       - package: SwiftTerm
     settings:

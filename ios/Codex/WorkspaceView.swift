@@ -16,13 +16,14 @@ enum WorkspacePage: String, CaseIterable, Identifiable {
 struct WorkspaceView: View {
     @EnvironmentObject private var store: WorkspaceStore
     @Environment(\.horizontalSizeClass) private var size
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var page = WorkspacePage.task
     @State private var showProjects = false
     @State private var showSessions = false
 
     var body: some View {
         Group {
-            if size == .regular {
+            if size == .regular && !dynamicTypeSize.isAccessibilitySize {
                 NavigationSplitView {
                     List {
                         Section("Workspace") {

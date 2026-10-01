@@ -35,6 +35,7 @@ struct SettingsView: View {
                 LabeledContent("File access", value: "Imported projects")
                 LabeledContent("App shell / PTY", value: store.capabilities?.process ?? "Detecting…")
                 LabeledContent("Execution connection", value: store.terminalStatus)
+                LabeledContent("Jailbreak capability", value: store.capabilities?.jailbreak ?? "Detecting…")
                 Text("Configure a remote exec-server or a separately installed iOS helper in Activity → Terminal. Helper connectivity does not establish jailbreak status.").font(.caption).foregroundStyle(.secondary)
                 Button("Cancel active task") { store.command("cancel") }.disabled(!store.working)
             }
@@ -44,6 +45,15 @@ struct SettingsView: View {
                 Button("Refresh diagnostics") { store.command("diagnostics") }
             }
             Section("Open source") {
+                Link("Codex source · Apache 2.0 license", destination: URL(string: "https://github.com/Justintunsday/codex/tree/codex/ios-native")!)
+                ForEach(["LICENSE", "NOTICE"], id: \.self) { name in
+                    if let url = Bundle.main.url(forResource: name, withExtension: nil),
+                       let content = try? String(contentsOf: url, encoding: .utf8) {
+                        NavigationLink(name == "LICENSE" ? "Codex license" : "Codex notices") {
+                            ScrollView { Text(content).font(.caption).textSelection(.enabled).padding(16) }.navigationTitle(name)
+                        }
+                    }
+                }
                 Link("SwiftTerm terminal emulator · MIT license", destination: URL(string: "https://github.com/migueldeicaza/SwiftTerm")!)
                 if let url = Bundle.main.url(forResource: "ThirdPartyNotices", withExtension: "txt"),
                    let notices = try? String(contentsOf: url, encoding: .utf8) {

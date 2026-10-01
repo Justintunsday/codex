@@ -23,6 +23,7 @@ final class WorkspaceUITests: XCTestCase {
         app.launchEnvironment["CODEX_UI_TEST_APPEARANCE"] = "dark"
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.tabBars.buttons["Task"].exists, "Accessibility sizes use the full-width workspace on both device families")
         attach("Dark conversation with large text", app: app)
     }
 
@@ -53,6 +54,9 @@ final class WorkspaceUITests: XCTestCase {
         editor.typeText("Reviewed edit.\n")
         app.buttons["reviewFileChange"].tap()
         XCTAssertTrue(app.buttons["approveChange"].waitForExistence(timeout: 5))
+        let start = app.staticTexts["reviewDiffStart"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        XCTAssertLessThan(start.frame.minY, app.segmentedControls.firstMatch.frame.maxY + 60)
         attach("File diff awaiting approval", app: app)
         app.buttons["approveChange"].tap()
         let file = app.staticTexts["fileContents"]
