@@ -5,6 +5,15 @@ on:
     branches: ["codex/ios-native"]
     paths: [".github/workflows/ios-ui.yml"]
   workflow_dispatch:
+    inputs:
+      device:
+        type: choice
+        options: [all, ipad]
+        default: all
+      testScope:
+        type: choice
+        options: [all, accessibility]
+        default: all
 
 permissions:
   contents: read
@@ -57,14 +66,21 @@ jobs:
       - name: Test each device with a fresh boot
         run: |
           set -o pipefail
+          test_arguments=()
+          if [ '${{ inputs.testScope }}' = accessibility ]; then
+            test_arguments+=('-only-testing:CodexUITests/WorkspaceUITests/testDarkAppearanceWithLargeDynamicType')
+          fi
           for destination in '${{ steps.simulator.outputs.iphone }}' '${{ steps.simulator.outputs.ipad }}'; do
+            if [ '${{ inputs.device }}' = ipad ] && [ "$destination" != '${{ steps.simulator.outputs.ipad }}' ]; then
+              continue
+            fi
             xcrun simctl shutdown all
             xcrun simctl boot "$destination"
             xcrun simctl bootstatus "$destination" -b
             xcodebuild -project ios/Codex.xcodeproj -scheme Codex -configuration Debug \
               -destination "id=$destination" -derivedDataPath ios/Build/Simulator \
               -skipPackagePluginValidation -resultBundlePath "ios/Build/UI-$destination.xcresult" \
-              CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic GENERATE_INFOPLIST_FILE=YES test-without-building
+              CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic GENERATE_INFOPLIST_FILE=YES "${test_arguments[@]}" test-without-building
             xcrun simctl shutdown "$destination"
           done
       - name: Export UI screenshots

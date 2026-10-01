@@ -26,8 +26,9 @@ final class WorkspaceUITests: XCTestCase {
         app.launchArguments = ["-AppleInterfaceStyle", "Dark", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launchEnvironment["CODEX_UI_TEST_APPEARANCE"] = "dark"
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "promptField").firstMatch.waitForExistence(timeout: 15))
-        XCTAssertTrue(app.tabBars.buttons["Task"].exists, "Accessibility sizes use the full-width workspace on both device families")
+        let prompt = app.descendants(matching: .any).matching(identifier: "promptField").firstMatch
+        XCTAssertTrue(prompt.waitForExistence(timeout: 15))
+        XCTAssertLessThanOrEqual(prompt.frame.minX, app.frame.minX + 40, "Accessibility sizes keep the composer in the full-width workspace")
         attach("Dark conversation with large text", app: app)
     }
 
