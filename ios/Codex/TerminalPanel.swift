@@ -158,7 +158,7 @@ private final class TerminalContainer: UIView {
         terminal.nativeForegroundColor = .label
         addSubview(terminal)
     }
-    required init?(coder: NSCoder) { nil }
+    required init?(coder: NSCoder) { return nil }
     override var intrinsicContentSize: CGSize { terminal.getOptimalFrameSize().size }
     override func layoutSubviews() {
         super.layoutSubviews()

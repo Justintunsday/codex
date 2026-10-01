@@ -3,9 +3,9 @@ name: Native iOS
 on:
   push:
     branches: ["codex/ios-native"]
-    paths: ["ios/**", "codex-rs/ios-*/**", "codex-rs/Cargo.toml", "codex-rs/Cargo.lock", ".github/workflows/ios-native.yml"]
+    paths: ["ios/**", "codex-rs/ios-*/**", "codex-rs/http-client/**", "codex-rs/Cargo.toml", "codex-rs/Cargo.lock", ".github/workflows/ios-native.yml"]
   pull_request:
-    paths: ["ios/**", "codex-rs/ios-*/**", "codex-rs/Cargo.toml", "codex-rs/Cargo.lock", ".github/workflows/ios-native.yml"]
+    paths: ["ios/**", "codex-rs/ios-*/**", "codex-rs/http-client/**", "codex-rs/Cargo.toml", "codex-rs/Cargo.lock", ".github/workflows/ios-native.yml"]
   workflow_dispatch:
     inputs:
       sign:
@@ -41,7 +41,7 @@ jobs:
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim --toolchain 1.95.0
           curl -LsSf https://get.nexte.st/0.9/mac | tar zxf - -C "$HOME/.cargo/bin"
       - name: Test mobile crates
-        run: just test -p codex-ios-platform -p codex-ios-runtime -p codex-ios-ffi
+        run: just test -p codex-http-client -p codex-ios-platform -p codex-ios-runtime -p codex-ios-ffi
       - name: Build arm64 device app
         run: bash ios/Scripts/build-app.sh 2>&1 | tee ios-build.log
       - name: Verify deployment metadata

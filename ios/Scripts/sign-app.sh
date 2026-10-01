@@ -46,6 +46,7 @@ with open(sys.argv[1], 'wb') as output:
 PY
 cd "$task_root/ios"
 xcodebuild -project Codex.xcodeproj -scheme Codex -configuration Release \
+  -skipPackagePluginValidation \
   -destination 'generic/platform=iOS' -archivePath Build/Codex-signed.xcarchive \
   DEVELOPMENT_TEAM="$IOS_TEAM_ID" PROVISIONING_PROFILE_SPECIFIER="$task_profile_name" \
   CODE_SIGN_IDENTITY="$task_identity" \

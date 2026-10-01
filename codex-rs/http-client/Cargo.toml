@@ -30,6 +30,9 @@ zstd = { workspace = true }
 [target.'cfg(target_os = "macos")'.dependencies]
 system-configuration = { workspace = true }
 
+[target.'cfg(target_os = "ios")'.dependencies]
+rustls-platform-verifier = "0.7.0"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 rustls-platform-verifier = "0.7.0"
 windows-sys = { version = "0.52", features = [
@@ -42,6 +45,7 @@ workspace = true
 
 [dev-dependencies]
 codex-utils-cargo-bin = { workspace = true }
+rustls-platform-verifier = "0.7.0"
 opentelemetry_sdk = { workspace = true }
 pretty_assertions = { workspace = true }
 rcgen = { workspace = true }

@@ -49,6 +49,7 @@ use std::sync::Arc;
 
 use codex_utils_rustls_provider::ensure_rustls_crypto_provider;
 use rustls::ClientConfig;
+#[cfg(not(target_os = "ios"))]
 use rustls::RootCertStore;
 use rustls_pki_types::CertificateDer;
 use rustls_pki_types::pem::PemObject;
@@ -142,6 +143,10 @@ pub enum BuildCustomCaTransportError {
         certificate_index: usize,
         source: rustls::Error,
     },
+
+    #[cfg(target_os = "ios")]
+    #[error("Failed to configure Apple system certificate verification: {0}")]
+    BuildApplePlatformTls(#[source] rustls::Error),
 }
 
 impl From<BuildCustomCaTransportError> for io::Error {
@@ -157,6 +162,8 @@ impl From<BuildCustomCaTransportError> for io::Error {
             }
             BuildCustomCaTransportError::BuildClientWithCustomCa { .. }
             | BuildCustomCaTransportError::BuildClientWithSystemRoots(_) => io::Error::other(error),
+            #[cfg(target_os = "ios")]
+            BuildCustomCaTransportError::BuildApplePlatformTls(_) => io::Error::other(error),
         }
     }
 }
@@ -239,6 +246,19 @@ fn build_rustls_client_config_with_env(
     build_rustls_client_config(bundle.as_ref())
 }
 
+#[cfg(target_os = "ios")]
+fn build_rustls_client_config(
+    bundle: Option<&ConfiguredCaBundle>,
+) -> Result<Arc<ClientConfig>, BuildCustomCaTransportError> {
+    let certificates = match bundle {
+        Some(bundle) => bundle.load_certificates()?,
+        None => Vec::new(),
+    };
+    crate::ios_tls::build_ios_platform_tls_config(certificates)
+        .map_err(BuildCustomCaTransportError::BuildApplePlatformTls)
+}
+
+#[cfg(not(target_os = "ios"))]
 fn build_rustls_client_config(
     bundle: Option<&ConfiguredCaBundle>,
 ) -> Result<Arc<ClientConfig>, BuildCustomCaTransportError> {

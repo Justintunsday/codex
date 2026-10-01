@@ -76,3 +76,6 @@ mod windows_tls;
 
 #[cfg(windows)]
 pub use crate::windows_tls::build_windows_platform_tls_config;
+
+#[cfg(any(target_os = "ios", test))]
+mod ios_tls;
